@@ -246,26 +246,37 @@ function drawRoutes() {
 
 // ── Draw or clear alternative routes ──────────────────────────
 function drawAlternatives() {
-  // Remove existing alternative layers (stored separately in state)
   state.altLayers.forEach((l) => l.remove());
   state.altLayers = [];
 
   if (!state.showAlternatives || state.results.length < 2) return;
 
   state.results.slice(1).forEach((r) => {
+    // Build full coord array for this alternative route
+    const latlngs = [];
     r.edges.forEach((edge) => {
       if (!edge.coords || edge.coords.length < 2) return;
-      const validCoords = edge.coords.filter(isValidCoord);
-      if (validCoords.length < 2) return;
-      const latlngs = validCoords.map(([lon, lat]) => [lat, lon]);
-      const line = L.polyline(latlngs, {
-        color: "#6b7280",
-        weight: 3,
-        opacity: 0.6,
-        dashArray: "8 6",
-      }).addTo(map);
-      state.altLayers.push(line);
+      edge.coords.filter(isValidCoord).forEach(([lon, lat]) => {
+        latlngs.push([lat, lon]);
+      });
     });
+
+    if (latlngs.length < 2) return;
+
+    // Google Maps style: thick dark border + thinner light fill on top
+    const border = L.polyline(latlngs, {
+      color: "#1a6fcc",
+      weight: 8,
+      opacity: 0.5,
+    }).addTo(map);
+
+    const fill = L.polyline(latlngs, {
+      color: "#6eaaec",
+      weight: 5,
+      opacity: 0.7,
+    }).addTo(map);
+
+    state.altLayers.push(border, fill);
   });
 }
 
