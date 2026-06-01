@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, send_from_directory, Response
 import logging
 import math
+import os
 from pathlib import Path
 import sys
 
@@ -25,11 +26,34 @@ from aed_route.config import (
 setup_logging()
 logger = logging.getLogger(__name__)
 
+PUBLIC_BASE_PATH = os.environ.get("PUBLIC_BASE_PATH", "").strip()
+if PUBLIC_BASE_PATH and not PUBLIC_BASE_PATH.startswith("/"):
+    PUBLIC_BASE_PATH = f"/{PUBLIC_BASE_PATH}"
+PUBLIC_BASE_PATH = PUBLIC_BASE_PATH.rstrip("/")
+if PUBLIC_BASE_PATH == "/":
+    PUBLIC_BASE_PATH = ""
+
 app = Flask(
     __name__,
     static_folder=str(PROJECT_ROOT / "static"),
-    static_url_path="/static",
+    static_url_path=(
+        f"{PUBLIC_BASE_PATH}/static" if PUBLIC_BASE_PATH else "/static"
+    ),
 )
+app.config["APPLICATION_ROOT"] = PUBLIC_BASE_PATH or "/"
+
+
+def app_route(rule: str, **options):
+    """Register a route with an optional public URL prefix alias."""
+    def decorator(func):
+        app.route(rule, **options)(func)
+        if PUBLIC_BASE_PATH:
+            app.route(f"{PUBLIC_BASE_PATH}{rule}", **options)(func)
+            if rule == "/":
+                app.route(PUBLIC_BASE_PATH, **options)(func)
+        return func
+
+    return decorator
 
 
 def _require_cache(name: str):
@@ -81,17 +105,22 @@ logger.info("Flask app ready.")
 
 
 # ── Routes ─────────────────────────────────────────────────────
-@app.route("/")
+@app_route("/")
 def index():
     return send_from_directory(str(PROJECT_ROOT / "static"), "index.html")
 
 
-@app.route("/api/aeds")
+@app_route("/healthz")
+def healthz():
+    return jsonify({"ok": True})
+
+
+@app_route("/api/aeds")
 def get_aeds():
     return jsonify(aeds_fc)
 
 
-@app.route("/api/isochrones")
+@app_route("/api/isochrones")
 def get_isochrones():
     cache_path = PROJECT_ROOT / ISOCHRONE_CACHE_REL_PATH
     with cache_path.open("r", encoding="utf-8") as f:
@@ -99,7 +128,7 @@ def get_isochrones():
     return Response(content, mimetype="application/json")
 
 
-@app.route("/api/boundary")
+@app_route("/api/boundary")
 def get_boundary():
     cache_path = PROJECT_ROOT / BOUNDARY_CACHE_REL_PATH
     with cache_path.open("r", encoding="utf-8") as f:
@@ -107,7 +136,7 @@ def get_boundary():
     return Response(content, mimetype="application/json")
 
 
-@app.route("/api/route", methods=["POST"])
+@app_route("/api/route", methods=["POST"])
 def route():
     data = request.get_json()
     if not data:

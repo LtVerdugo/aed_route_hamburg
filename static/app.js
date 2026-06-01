@@ -11,6 +11,16 @@ const state = {
   isochronesVisible: false,
 };
 
+const APP_BASE = (() => {
+  const path = window.location.pathname.replace(/\/index\.html$/, "");
+  const staticIndex = path.indexOf("/static");
+  if (staticIndex >= 0) return path.slice(0, staticIndex).replace(/\/$/, "");
+  return path.replace(/\/$/, "");
+})();
+
+const API_BASE = (window.AED_ROUTE_API_BASE || `${APP_BASE}/api`).replace(/\/$/, "");
+const apiUrl = (path) => `${API_BASE}/${path.replace(/^\/+/, "")}`;
+
 // ── Map init ───────────────────────────────────────────────────
 const map = L.map("map", { zoomControl: false }).setView(
   [53.5511, 9.9937], 12
@@ -44,7 +54,7 @@ const MASK_OVERSCAN = 50000;
 
 // ── Load and draw AEDs ─────────────────────────────────────────
 async function loadAEDs() {
-  const res = await fetch("/api/aeds");
+  const res = await fetch(apiUrl("aeds"));
   const fc = await res.json();
   fc.features.forEach((f) => {
     if (f.geometry.type !== "Point") return;
@@ -103,7 +113,7 @@ map.on("click", async (e) => {
   }).addTo(map);
 
   try {
-    const res = await fetch("/api/route", {
+    const res = await fetch(apiUrl("route"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ lat, lon: lng, mode: state.mode }),
@@ -334,7 +344,7 @@ function showHint() {
 
 // ── Load and draw Hamburg boundary ────────────────────────────
 async function loadBoundary() {
-  const res = await fetch("/api/boundary");
+  const res = await fetch(apiUrl("boundary"));
   const fc = await res.json();
 
   L.geoJSON(fc, {
@@ -386,7 +396,7 @@ function updateMask(fc) {
 
 // ── Load isochrones ────────────────────────────────────────────
 async function loadIsochrones() {
-  const res = await fetch("/api/isochrones?v=" + Date.now());
+  const res = await fetch(apiUrl("isochrones") + "?v=" + Date.now());
   const fc = await res.json();
 
   // Separate features by time threshold
