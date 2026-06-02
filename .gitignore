@@ -1,28 +1,22 @@
-# Virtual environment
-.venv/
-
-# Data files — heavy cache files served via Google Drive
-data/interim/
-data/processed/
-data/raw/
-
-# Python
+# ── Build artifacts — not needed in repo ──────────────────
+/src/
+/app/
+/data/
+/docs/
+/notebooks/
+/tests/
+*.pkl
+*.py
+*.pyc
 __pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
+/requirements.txt
+/wsgi.py
+/build_hamburg_mitte.py
+.env
+.venv/
 *.egg-info/
-dist/
-build/
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Logs
 *.log
 
-# IDE
-.vscode/
-.idea/
+# ── Keep only static/ ─────────────────────────────────────
+# static/ and its contents are tracked (GeoJSON + frontend)
