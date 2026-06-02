@@ -163,3 +163,130 @@ html, body {
   0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.7; }
   100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
 }
+
+/* ── Result cards ──────────────────────────────────────────────── */
+.result-card {
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+.result-card.best {
+  background: #f0fdf4;
+  border: 1.5px solid #16a34a;
+}
+
+.result-card.alternative {
+  background: #f9fafb;
+  border: 1.5px solid #e5e7eb;
+}
+
+.rank-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.result-card.best .rank-label {
+  color: #16a34a;
+}
+
+.time {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.distance {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.extra-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.aed-meta {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 6px;
+}
+
+/* ── Compare button ────────────────────────────────────────────── */
+#btn-compare {
+  width: 100%;
+  padding: 10px;
+  margin: 4px 0 12px;
+  border: 1.5px solid #16a34a;
+  border-radius: 8px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+#btn-compare:hover {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+#btn-compare.active {
+  background: #f9fafb;
+  color: #374151;
+  border-color: #e5e7eb;
+}
+
+#btn-compare.active:hover {
+  background: #f0fdf4;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+/* ── Demo buttons ──────────────────────────────────────────────── */
+#btn-demo {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 6px;
+  border: 1.5px solid #16a34a;
+  border-radius: 8px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+#btn-demo:hover {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+#btn-reset {
+  width: 100%;
+  padding: 8px 4px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+
+#btn-reset:hover {
+  background: #f0fdf4;
+  border-color: #16a34a;
+}
