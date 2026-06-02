@@ -34,7 +34,3 @@ https://www.cml.hcu-hamburg.de/demos/aed-routing/static/
 
 No backend required. All data is pre-generated.
 
-## Uploading to the server
-
-The colleague only needs to upload the static/ folder.
-No Python, no dependencies, no configuration needed.
