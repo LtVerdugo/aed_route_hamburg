@@ -1,4 +1,7 @@
-from flask import Flask, jsonify, request, send_from_directory, Response
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import logging
 import math
 import os
@@ -25,35 +28,6 @@ from aed_route.config import (
 
 setup_logging()
 logger = logging.getLogger(__name__)
-
-PUBLIC_BASE_PATH = os.environ.get("PUBLIC_BASE_PATH", "").strip()
-if PUBLIC_BASE_PATH and not PUBLIC_BASE_PATH.startswith("/"):
-    PUBLIC_BASE_PATH = f"/{PUBLIC_BASE_PATH}"
-PUBLIC_BASE_PATH = PUBLIC_BASE_PATH.rstrip("/")
-if PUBLIC_BASE_PATH == "/":
-    PUBLIC_BASE_PATH = ""
-
-app = Flask(
-    __name__,
-    static_folder=str(PROJECT_ROOT / "static"),
-    static_url_path=(
-        f"{PUBLIC_BASE_PATH}/static" if PUBLIC_BASE_PATH else "/static"
-    ),
-)
-app.config["APPLICATION_ROOT"] = PUBLIC_BASE_PATH or "/"
-
-
-def app_route(rule: str, **options):
-    """Register a route with an optional public URL prefix alias."""
-    def decorator(func):
-        app.route(rule, **options)(func)
-        if PUBLIC_BASE_PATH:
-            app.route(f"{PUBLIC_BASE_PATH}{rule}", **options)(func)
-            if rule == "/":
-                app.route(PUBLIC_BASE_PATH, **options)(func)
-        return func
-
-    return decorator
 
 
 def _require_cache(name: str):
@@ -101,64 +75,66 @@ logger.info(
     len(isochrones_fc.get("features", [])),
 )
 
-logger.info("Flask app ready.")
+logger.info("FastAPI app ready.")
+
+app = FastAPI()
+
+app.mount(
+    "/static",
+    StaticFiles(directory=str(PROJECT_ROOT / "static")),
+    name="static",
+)
 
 
 # ── Routes ─────────────────────────────────────────────────────
-@app_route("/")
-def index():
-    return send_from_directory(str(PROJECT_ROOT / "static"), "index.html")
+@app.get("/")
+async def index():
+    return FileResponse(str(PROJECT_ROOT / "static" / "index_original.html"))
 
 
-@app_route("/healthz")
-def healthz():
-    return jsonify({"ok": True})
+@app.get("/healthz")
+async def healthz():
+    return {"ok": True}
 
 
-@app_route("/api/aeds")
-def get_aeds():
-    return jsonify(aeds_fc)
+@app.get("/api/aeds")
+async def get_aeds():
+    return aeds_fc
 
 
-@app_route("/api/isochrones")
-def get_isochrones():
+@app.get("/api/isochrones")
+async def get_isochrones():
     cache_path = PROJECT_ROOT / ISOCHRONE_CACHE_REL_PATH
-    with cache_path.open("r", encoding="utf-8") as f:
-        content = f.read()
-    return Response(content, mimetype="application/json")
+    return Response(cache_path.read_bytes(), media_type="application/json")
 
 
-@app_route("/api/boundary")
-def get_boundary():
+@app.get("/api/boundary")
+async def get_boundary():
     cache_path = PROJECT_ROOT / BOUNDARY_CACHE_REL_PATH
-    with cache_path.open("r", encoding="utf-8") as f:
-        content = f.read()
-    return Response(content, mimetype="application/json")
+    return Response(cache_path.read_bytes(), media_type="application/json")
 
 
-@app_route("/api/route", methods=["POST"])
-def route():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
-    lat = float(data["lat"])
-    lon = float(data["lon"])
-    mode = str(data.get("mode", "walk"))
+class RouteRequest(BaseModel):
+    lat: float
+    lon: float
+    mode: str = "walk"
 
-    if mode not in ("walk", "bike", "car"):
-        return jsonify({"error": "Invalid mode"}), 400
+
+@app.post("/api/route")
+async def route(body: RouteRequest):
+    if body.mode not in ("walk", "bike", "car"):
+        raise HTTPException(status_code=400, detail="Invalid mode")
 
     results = find_nearest_aeds(
-        origin_lon=lon,
-        origin_lat=lat,
-        mode=mode,
+        origin_lon=body.lon,
+        origin_lat=body.lat,
+        mode=body.mode,
         graph_bundle=bundle,
         aed_index=aed_index,
         node_index=node_index,
         k=SHORTLIST_EUCLIDEAN_K,
     )
 
-    # Serialize results — convert shapely geometries to GeoJSON coords
     serializable = []
     for r in results:
         edges = []
@@ -196,8 +172,9 @@ def route():
             "edges": edges,
         })
 
-    return jsonify({"results": serializable})
+    return {"results": serializable}
 
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5050)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=5050)

@@ -16,7 +16,7 @@ Transfer the project folder to the server. The final structure should look like 
 
 aed_route_hamburg/
 ├── app/
-│   └── flask_app.py
+│   └── app.py
 ├── data/
 │   ├── interim/
 │   │   └── hamburg_graph.pkl        ← 364 MB, must be present
@@ -59,7 +59,7 @@ These files are NOT downloaded automatically at startup. If any of them is missi
 ### 5. Start the server
 Run this command from the project root:
 
-gunicorn --workers 1 --bind 0.0.0.0:5050 --timeout 120 wsgi:app
+uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
 
 Important notes:
 - --workers must be 1. The graph bundle (364 MB) is loaded into memory once at startup and is not safe to share across multiple worker processes.
@@ -91,8 +91,7 @@ If the reverse proxy forwards the prefix through to Flask unchanged, start
 Gunicorn with `PUBLIC_BASE_PATH`:
 
 ```bash
-PUBLIC_BASE_PATH=/demos/aed-routing \
-gunicorn --workers 1 --bind 0.0.0.0:5050 --timeout 120 wsgi:app
+uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
 ```
 
 Example nginx config for that mode:

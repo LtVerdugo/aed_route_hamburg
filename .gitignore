@@ -1,22 +1,19 @@
-# ── Build artifacts — not needed in repo ──────────────────
-/src/
-/app/
+# ── Data and large binaries — mount as volume at runtime ──
 /data/
-/docs/
-/notebooks/
-/tests/
 *.pkl
-*.py
+
+# ── Python artifacts ──────────────────────────────────────
 *.pyc
 __pycache__/
-/requirements.txt
-/wsgi.py
-/build_hamburg_mitte.py
-.env
-.venv/
 *.egg-info/
+
+# ── Dev environment ───────────────────────────────────────
+.venv/
+.env
+/notebooks/
+/build_hamburg_mitte.py
+
+# ── OS / editor ───────────────────────────────────────────
 .DS_Store
 *.log
-
-# ── Keep only static/ ─────────────────────────────────────
-# static/ and its contents are tracked (GeoJSON + frontend)
+.vscode/
