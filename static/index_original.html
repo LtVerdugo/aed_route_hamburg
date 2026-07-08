@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AED Route Hamburg</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-ant-path@1.3.0/dist/leaflet-ant-path.js"></script>
+  <script src="https://unpkg.com/leaflet.motion@0.3.2/dist/leaflet.motion.min.js"></script>
+  <link rel="stylesheet" href="static/styles_original.css"/>
+</head>
+<body>
+
+<!-- Help popup -->
+<div id="help-overlay">
+  <div id="help-modal">
+    <h2>AED Route Hamburg — How to use</h2>
+    <div class="help-item">
+      <span class="help-icon">🗺️</span>
+      <div><strong>Explore the map</strong><br>Red dots mark all AED (defibrillator) locations across Hamburg. Toggle their visibility using the Layers panel.</div>
+    </div>
+    <div class="help-item">
+      <span class="help-icon">📍</span>
+      <div><strong>Find the nearest AED</strong><br>Click anywhere on the map to calculate the shortest route from that point to the nearest AED.</div>
+    </div>
+    <div class="help-item">
+      <span class="help-icon">🚶</span>
+      <div><strong>Choose your transport mode</strong><br>Select Walk, Bike or Car in the Transport panel before clicking. Each mode uses different road rules and speeds.</div>
+    </div>
+    <div class="help-item">
+      <span class="help-icon">🔀</span>
+      <div><strong>Compare alternative routes</strong><br>After a route is calculated, click "Compare routes" to see up to 2 alternative AED options with their time difference.</div>
+    </div>
+    <div class="help-item">
+      <span class="help-icon">⏱️</span>
+      <div><strong>Isochrones</strong><br>Enable the Isochrones layer to see 2-minute and 4-minute walking coverage areas around each AED.</div>
+    </div>
+    <button id="btn-got-it">Got it</button>
+  </div>
+</div>
+
+<!-- Floating help button -->
+<button id="btn-how-to-use">How to use</button>
+
+<div id="sidebar">
+
+  <!-- Header -->
+  <div class="sidebar-header">
+    <div class="sidebar-title">◈ AED Route</div>
+    <span class="sidebar-badge">Hamburg</span>
+  </div>
+
+  <!-- Transport -->
+  <div class="sidebar-section">
+    <div class="section-label">Transport</div>
+    <div class="mode-row">
+      <button class="mode-btn active" data-mode="walk">🚶 Walk</button>
+      <button class="mode-btn" data-mode="bike">🚲 Bike</button>
+      <button class="mode-btn" data-mode="car">🚗 Car</button>
+    </div>
+  </div>
+
+  <!-- Route -->
+  <div class="sidebar-section">
+    <div class="section-label">Route</div>
+    <div id="hint">Click on the map to find the nearest AED.</div>
+    <div id="loading">Calculating route…</div>
+    <div id="results">
+      <div id="result-best"></div>
+      <button id="btn-compare">Compare routes</button>
+      <div id="result-alternatives" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <!-- Layers -->
+  <div class="sidebar-section">
+    <div class="section-label">Layers</div>
+    <div class="toggle-row">
+      <span class="toggle-label">AED locations</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-aeds" checked/>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Isochrones</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-isochrones"/>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">City mask</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-mask" checked/>
+        <span class="switch-slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="sidebar-divider"></div>
+
+  <!-- Legend -->
+  <div class="sidebar-section">
+    <div class="section-label">Legend</div>
+    <div class="legend-row">
+      <span class="legend-dot" style="background:#16a34a;"></span>
+      <span class="legend-label">Best route</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-dot" style="background:#6b7280;"></span>
+      <span class="legend-label">Alternatives</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-dot" style="background:rgba(22,163,74,0.5);"></span>
+      <span class="legend-label">Isochrone 2 min</span>
+    </div>
+    <div class="legend-row">
+      <span class="legend-dot" style="background:rgba(249,115,22,0.5);"></span>
+      <span class="legend-label">Isochrone 4 min</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<script src="static/app_original.js"></script>
+</body>
+</html>
