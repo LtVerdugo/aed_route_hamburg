@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import logging
+from pathlib import Path
+
 import networkx as nx
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
+
+from .io import read_json, write_json
+
+logger = logging.getLogger(__name__)
 
 
 def build_aed_index(
@@ -107,8 +114,25 @@ def compute_giant_component_node_keys(G: nx.MultiDiGraph) -> set:
     in this project's diagnostics (Fase 4's car-mode coverage analysis,
     Fase 5's golden-file case selection) — computed over the general
     graph, not restricted to any single transport mode's edges.
+
+    Note (flagged in the Fase 7 code review, 2026-08-14): "weakly
+    connected" is a strictly LOOSER criterion than "reachable via
+    `nx.astar_path` for a specific mode". A node can sit in the giant
+    weakly connected component and still make `find_nearest_aeds` raise
+    `NetworkXNoPath` for a given mode, if the only edges connecting it run
+    the wrong direction for that mode's directed subgraph (car respects
+    oneway; walk/bike don't). This function does not — and is not meant
+    to — eliminate `NetworkXNoPath` entirely; it only removes the origins
+    that could never succeed in ANY mode. The logging added in
+    `routing.py` for that exception is what gives visibility into any
+    remaining per-mode cases.
     """
-    components = nx.weakly_connected_components(G)
+    components = list(nx.weakly_connected_components(G))
+    if not components:
+        raise ValueError(
+            "No components found — graph has no nodes? Cannot determine "
+            "a giant component."
+        )
     giant = max(components, key=len)
     return set(giant)
 
@@ -183,3 +207,74 @@ def find_candidate_aed_nodes(
         }
         for dist, idx in zip(distances, indices)
     ]
+
+
+def load_or_compute_giant_component(
+    cache_path: Path,
+    G: nx.MultiDiGraph,
+    all_node_keys: set,
+    graph_pkl_sha256: str,
+) -> tuple[set, set, bool]:
+    """
+    Load the giant-component exclusion set from `cache_path` if it exists,
+    parses as well-formed JSON, AND was computed from the same graph
+    pickle (`graph_pkl_sha256` matches) — otherwise (re)compute it from
+    `G` and (over)write the cache. Returns
+    `(giant_node_keys, excluded_node_keys, was_loaded_from_cache)`.
+
+    Extracted into its own function (Fase 7 code review, 2026-08-14) so
+    the cache logic — previously inline in `app/app.py` — is unit
+    testable without needing the full app startup sequence or the 364 MB
+    production graph.
+
+    Hardened against cache corruption (the specific gap the code review
+    found): missing file, malformed JSON, a non-dict root, or a missing/
+    wrong-typed `excluded_node_keys` field are ALL treated the same way
+    as a checksum mismatch — logged and safely recomputed — never allowed
+    to propagate as an uncaught exception and crash startup. Before this
+    fix, a corrupted cache file (e.g. from a killed process mid-write)
+    would crash the app instead of just recomputing.
+    """
+    cached: dict | None = None
+    if cache_path.exists():
+        try:
+            raw = read_json(cache_path)
+            if not isinstance(raw, dict):
+                raise ValueError("cache root is not a JSON object")
+            if not isinstance(raw.get("excluded_node_keys"), list):
+                raise ValueError("missing or malformed 'excluded_node_keys'")
+            cached = raw
+        except Exception as exc:
+            logger.warning(
+                "Giant component cache at %s is corrupt or malformed (%s) "
+                "— recomputing instead of crashing on it.",
+                cache_path, exc,
+            )
+            cached = None
+
+    if cached is not None and cached.get("graph_pkl_sha256") == graph_pkl_sha256:
+        excluded_node_keys = set(cached["excluded_node_keys"])
+        giant_node_keys = all_node_keys - excluded_node_keys
+        return giant_node_keys, excluded_node_keys, True
+
+    if cached is not None:
+        logger.warning(
+            "Giant component cache at %s is STALE (pickle checksum changed "
+            "from %s to %s) — recomputing instead of trusting a cache that "
+            "could reference a different graph.",
+            cache_path, cached.get("graph_pkl_sha256"), graph_pkl_sha256,
+        )
+
+    giant_node_keys = compute_giant_component_node_keys(G)
+    excluded_node_keys = all_node_keys - giant_node_keys
+    write_json(cache_path, {
+        "graph_pkl_sha256": graph_pkl_sha256,
+        "total_nodes": len(all_node_keys),
+        "giant_component_size": len(giant_node_keys),
+        "excluded_node_count": len(excluded_node_keys),
+        # node_key is a mix of ints (road nodes) and strings ("aed_...").
+        # Sorted by str() only for a stable, diffable file — membership
+        # checks after loading compare the original JSON-preserved types.
+        "excluded_node_keys": sorted(excluded_node_keys, key=str),
+    })
+    return giant_node_keys, excluded_node_keys, False

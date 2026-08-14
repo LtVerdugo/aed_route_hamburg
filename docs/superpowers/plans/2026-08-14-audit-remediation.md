@@ -584,10 +584,14 @@ Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
       cuantificada), más una sección nueva en "Edge Cases and Observed
       Anomalies" documentando el mecanismo de falso positivo del caso E.
 - [x] **Paso 8:** Commit.
-- [ ] **Paso 9 — OBLIGATORIO:** `superpowers:requesting-code-review`,
-      pendiente de ejecutar tras este commit.
-- [ ] **Paso 10:** `verification-before-completion` + smoke test final,
-      pendiente tras la revisión.
+- [x] **Paso 9 — OBLIGATORIO:** `superpowers:requesting-code-review`
+      ejecutada. 2 hallazgos "Important" (caché no resistente a
+      corrupción — 2 repros directos confirmados y corregidos; sin
+      cobertura de test) — ambos reverificados y corregidos. Detalle en
+      `docs/decisions.md`.
+- [x] **Paso 10:** `verification-before-completion` + smoke test final.
+      20/20 tests en verde, golden files sin cambios de contenido,
+      arranque en vivo idéntico tras el refactor.
 
 ---
 

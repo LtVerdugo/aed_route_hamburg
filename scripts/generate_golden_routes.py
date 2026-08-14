@@ -226,9 +226,16 @@ def write_manifest():
         "generator_script": "scripts/generate_golden_routes.py",
         "case_ids": [c["id"] for c in CASES],
         "note": (
-            "Baseline generado ANTES de cualquier fix (Fases 6/7/8). No "
-            "editar los .json de tests/golden/ a mano — regenerar con este "
-            "script y revisar el diff explícitamente."
+            "generated_with_commit registra el commit vigente en la ÚLTIMA "
+            "regeneración de este baseline, no necesariamente un estado "
+            "'antes de cualquier fix' — el baseline original (previo a las "
+            "Fases 6/7/8) se generó con el commit adf2f53; desde entonces "
+            "se ha regenerado tras cambios que sí debían alterar algunos "
+            "casos (ver docs/decisions.md, Fases 6 y 7, para el historial "
+            "de qué cambió y por qué). No editar los .json de tests/golden/ "
+            "a mano — regenerar con este script y revisar el diff "
+            "explícitamente, caso por caso, antes de aceptar cualquier "
+            "cambio."
         ),
     }
     (GOLDEN_DIR / "MANIFEST.json").write_text(

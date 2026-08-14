@@ -765,3 +765,75 @@ casos ya marcados como "seguirá vacío incluso tras la Fase 7"
 relación con el componente gigante (`clausewitz_kaserne`, sin ningún nodo
 a <=100m del punto exacto, ni antes ni después; `water_point`). Ningún
 caso cambió fuera de lo predicho.
+
+---
+
+## 2026-08-14 — Fase 7: revisión de código obligatoria — 2 hallazgos "Important" verificados y corregidos
+
+Revisor independiente cargó el pickle real de producción tres veces y
+verificó de forma empírica cada cifra (tamaño del componente gigante, los
+9 AEDs excluidos coincidiendo carácter a carácter, conteos de golden
+files) — todo confirmado correcto. Encontró además, exactamente sobre el
+punto que se le pidió verificar explícitamente (invalidación de caché
+ante un pickle que cambiara), un problema real que reproduje yo mismo
+antes de corregirlo:
+
+1. **La lectura de la caché no era resistente a corrupción — CONFIRMADO
+   con dos repros directos, corregido.** `read_json` sobre un JSON
+   truncado/corrupto lanza `json.JSONDecodeError` sin capturar; una caché
+   con el checksum correcto pero sin `excluded_node_keys` lanza `KeyError`
+   sin capturar — ambos crashean el arranque en vez de recomputar, pese a
+   que el mecanismo de invalidación por checksum en sí funcionaba bien
+   para el caso que se pidió verificar (checksum ausente o de tipo
+   incorrecto sí caía correctamente en la rama de recómputo). Reproducidos
+   ambos casos con un script mínimo antes de tocar nada. **Corregido**:
+   la lógica de caché se extrajo de `app.py` a una función propia y
+   testable, `load_or_compute_giant_component` (`nearest.py`), que
+   envuelve la lectura completa (parseo JSON, tipo de la raíz, presencia y
+   tipo de `excluded_node_keys`) en un único `try/except`, tratando
+   cualquier fallo igual que un checksum desactualizado: log de WARNING y
+   recómputo, nunca una excepción sin capturar.
+2. **Sin cobertura de test para `compute_giant_component_node_keys`,
+   `filter_node_index_to_keys` ni la lógica de caché — mismo tipo de hueco
+   ya señalado y cerrado una fase antes para `_car_max_speed_m_s`.**
+   **Corregido**: `tests/test_giant_component.py` (13 tests) — componente
+   gigante sobre grafos sintéticos con componentes de tamaños distintos,
+   direccionalidad "weakly connected", grafo vacío; filtrado de
+   `node_index` preservando la correspondencia key↔coordenada y
+   reconstruyendo el `cKDTree` sobre el subconjunto correcto; y las 6
+   ramas de `load_or_compute_giant_component` (miss, hit válido, checksum
+   obsoleto, JSON corrupto, esquema incompleto, raíz no-dict) — estas dos
+   últimas son regresiones directas de los repros del hallazgo 1, no
+   solo cobertura genérica.
+
+**Recomendación del revisor incorporada, no solo anotada:** "weakly
+connected" es una condición más débil que "alcanzable con `astar_path`
+para un modo concreto" (la direccionalidad de coche puede dejar un nodo
+del componente gigante inalcanzable igualmente). Añadida como nota
+explícita en el docstring de `compute_giant_component_node_keys` — el
+logging de `NetworkXNoPath` ya añadido en el commit anterior es lo que da
+visibilidad sobre esos casos residuales, que siguen siendo posibles y
+esperados.
+
+**Hallazgos "Minor" corregidos de paso** (bajo impacto, pero triviales de
+aplicar): `del node_index_unfiltered` tras filtrar (evita mantener un
+segundo `cKDTree` de 658k puntos en memoria sin necesidad);
+`compute_giant_component_node_keys` ahora falla con un `ValueError`
+explícito sobre un grafo sin nodos, en vez de un `ValueError` críptico de
+`max()` sobre secuencia vacía; el campo `note` de
+`tests/golden/MANIFEST.json` corregido para no afirmar "generado ANTES de
+cualquier fix" cuando en realidad registra el commit de la última
+regeneración (que ya incluye las Fases 6 y 7). El comentario en español
+dentro de `config.py` (única inconsistencia de idioma señalada, el resto
+del archivo está en inglés) se dejó sin cambiar — cosmético, y el propio
+revisor confirmó que ya hay comentarios en español en otras partes del
+proyecto.
+
+Verificado tras las correcciones: 20/20 tests en verde
+(`pytest tests/ -v` → "20 passed": 5 de `test_car_max_speed.py` + 2 de
+`test_heuristic_admissibility.py` + 13 nuevos de
+`test_giant_component.py`). Golden files sin cambios de contenido (solo
+el hash de commit y el texto de `note` en `MANIFEST.json`, ambos
+actualizaciones intencionadas de esta revisión). Arranque verificado en
+vivo: mismo comportamiento exacto que antes del refactor (mismos logs,
+mismos 9 AEDs, mismo WARNING).

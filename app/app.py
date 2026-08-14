@@ -18,12 +18,12 @@ from aed_route.utils import setup_logging, sha256_of_file
 from aed_route.nearest import (
     build_aed_index,
     build_node_index,
-    compute_giant_component_node_keys,
     filter_node_index_to_keys,
+    load_or_compute_giant_component,
 )
 from aed_route.routing import find_nearest_aeds
 from aed_route.graph_builder_osm import load_or_build_graph_bundle
-from aed_route.io import load_or_build_geojson, read_json, write_json
+from aed_route.io import load_or_build_geojson
 from aed_route.isochrones import compute_isochrones
 from aed_route.config import (
     AEDS_CACHE_REL_PATH,
@@ -91,38 +91,21 @@ all_node_keys = set(nodes_df["node_key"].tolist())
 giant_cache_path = PROJECT_ROOT / GIANT_COMPONENT_CACHE_REL_PATH
 graph_pkl_sha256 = sha256_of_file(PROJECT_ROOT / GRAPH_CACHE_REL_PATH)
 
-_cached = read_json(giant_cache_path) if giant_cache_path.exists() else None
-if _cached is not None and _cached.get("graph_pkl_sha256") == graph_pkl_sha256:
-    excluded_node_keys = set(_cached["excluded_node_keys"])
-    giant_node_keys = all_node_keys - excluded_node_keys
-    logger.info(
-        "Giant component loaded from cache: %d nodes, %d excluded (%s)",
-        len(giant_node_keys), len(excluded_node_keys), giant_cache_path,
-    )
-else:
-    if _cached is not None:
-        logger.warning(
-            "Giant component cache at %s is STALE (pickle checksum "
-            "changed from %s to %s) — recomputing instead of trusting a "
-            "cache that could reference a different graph.",
-            giant_cache_path, _cached.get("graph_pkl_sha256"), graph_pkl_sha256,
-        )
-    giant_node_keys = compute_giant_component_node_keys(bundle["graph"])
-    excluded_node_keys = all_node_keys - giant_node_keys
-    write_json(giant_cache_path, {
-        "graph_pkl_sha256": graph_pkl_sha256,
-        "total_nodes": len(all_node_keys),
-        "giant_component_size": len(giant_node_keys),
-        "excluded_node_count": len(excluded_node_keys),
-        # node_key is a mix of ints (road nodes) and strings ("aed_...").
-        # Sorted by str() only for a stable, diffable file — membership
-        # checks after loading compare the original JSON-preserved types.
-        "excluded_node_keys": sorted(excluded_node_keys, key=str),
-    })
-    logger.info(
-        "Giant component computed and cached: %d nodes, %d excluded (%s)",
-        len(giant_node_keys), len(excluded_node_keys), giant_cache_path,
-    )
+# load_or_compute_giant_component (src/aed_route/nearest.py) hardened,
+# after the Fase 7 code review, against a corrupt/malformed cache file
+# (previously an uncaught JSONDecodeError/KeyError could crash startup —
+# now treated the same as a checksum mismatch: logged and recomputed).
+giant_node_keys, excluded_node_keys, _was_cached = load_or_compute_giant_component(
+    cache_path=giant_cache_path,
+    G=bundle["graph"],
+    all_node_keys=all_node_keys,
+    graph_pkl_sha256=graph_pkl_sha256,
+)
+logger.info(
+    "Giant component %s: %d nodes, %d excluded (%s)",
+    "loaded from cache" if _was_cached else "computed and cached",
+    len(giant_node_keys), len(excluded_node_keys), giant_cache_path,
+)
 
 logger.info("Building spatial indices...")
 node_index_unfiltered = build_node_index(nodes_df)
@@ -132,6 +115,7 @@ node_index_unfiltered = build_node_index(nodes_df)
 # never yield a route to any AED. See docs/decisions.md for the AED side,
 # which is NOT re-snapped here (accepted technical debt — see below).
 node_index = filter_node_index_to_keys(node_index_unfiltered, giant_node_keys)
+del node_index_unfiltered  # a second full-size cKDTree is dead weight past this point
 aed_index = build_aed_index(aeds_fc, nodes_df)
 
 aed_nodes_outside_giant = [
