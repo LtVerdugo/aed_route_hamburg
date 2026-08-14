@@ -220,3 +220,17 @@ está montado hoy en `app/app.py`. Según el resultado, `README_deploy.md`
 tendrá que documentar ese escenario como inviable, o como uno que funciona
 hoy por un efecto colateral del frontend y no por diseño explícito del
 backend — ninguna de las dos cosas está determinada todavía.
+
+---
+
+## 2026-08-14 — Fase 3(a): `POST /api/route` ya no bloquea el event loop — cierra: C10
+
+`find_nearest_aeds` (síncrona, corre A* hasta `SHORTLIST_EUCLIDEAN_K` veces
+sobre un grafo de ~658k nodos) se llamaba directamente dentro del handler
+`async def route(...)` de `app/app.py`, bloqueando el único hilo del event
+loop de uvicorn durante toda la búsqueda — cualquier petición concurrente
+(incluido `/healthz`) quedaba en cola detrás. Corregido envolviendo la
+llamada en `await asyncio.to_thread(find_nearest_aeds, ...)`. No hay suite
+automatizada todavía para verificar esto con un test de concurrencia real
+(el arnés llega en la Fase 5); verificado manualmente con el smoke test
+(arranque + rutas en los tres modos) — ver registro en `docs/smoke_test.md`.

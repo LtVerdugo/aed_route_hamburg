@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import asyncio
 import logging
 import math
 import os
@@ -125,7 +126,13 @@ async def route(body: RouteRequest):
     if body.mode not in ("walk", "bike", "car"):
         raise HTTPException(status_code=400, detail="Invalid mode")
 
-    results = find_nearest_aeds(
+    # find_nearest_aeds is synchronous/CPU-bound (runs A* on a ~658k-node
+    # graph up to SHORTLIST_EUCLIDEAN_K times). Running it directly inside
+    # this async handler would block uvicorn's single event loop for the
+    # full duration of the search, stalling every other concurrent request
+    # (including /healthz) — see docs/decisions.md, 2026-08-14 (closes C10).
+    results = await asyncio.to_thread(
+        find_nearest_aeds,
         origin_lon=body.lon,
         origin_lat=body.lat,
         mode=body.mode,
