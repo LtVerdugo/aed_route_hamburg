@@ -234,3 +234,28 @@ llamada en `await asyncio.to_thread(find_nearest_aeds, ...)`. No hay suite
 automatizada todavía para verificar esto con un test de concurrencia real
 (el arnés llega en la Fase 5); verificado manualmente con el smoke test
 (arranque + rutas en los tres modos) — ver registro en `docs/smoke_test.md`.
+
+---
+
+## 2026-08-14 — Fase 3(c): dependencias sin uso confirmado retiradas de `requirements.txt`; archivo huérfano eliminado — cierra: C15, C17
+
+Reconfirmado por grep (sin uso directo en `app/` ni `src/`) antes de tocar
+nada: `python-multipart` (solo necesario en FastAPI para `Form`/`UploadFile`,
+ninguno usado aquí) y `pyarrow` (sin ningún `import pyarrow` ni uso de
+motor Arrow explícito en el código). Ambos retirados de `requirements.txt`.
+`geopandas` SÍ se mantiene, pese a no importarse directamente en el código
+propio: es dependencia transitiva real de `osmnx` (usada indirectamente vía
+`ox.graph_to_gdfs` en `isochrones.py`), declararla explícitamente es
+razonable.
+
+`static/data/demo_rathaus_response.json` eliminado — huérfano, sin ninguna
+referencia en el JS/HTML del repo (reconfirmado por grep antes de borrar).
+
+**Limitación de esta verificación, dicha explícitamente:** el `.venv` de
+este entorno ya tenía `python-multipart`/`pyarrow` instalados antes de este
+cambio; retirarlos de `requirements.txt` no los desinstala del venv
+actual, así que el smoke test de este commit no prueba de verdad que el
+proyecto siga instalando y arrancando correctamente con un `pip install -r
+requirements.txt` limpio y sin ellos — solo prueba que el código sigue
+funcionando con el venv ya existente. No se ha creado un venv nuevo para
+verificar esto de forma más rigurosa en esta pasada.
