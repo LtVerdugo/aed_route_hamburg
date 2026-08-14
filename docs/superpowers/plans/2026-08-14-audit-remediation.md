@@ -433,17 +433,29 @@ Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
 
 **Files:** ninguno hasta obtener respuesta
 
-- [ ] **Pregunta (a):** `SHORTLIST_EUCLIDEAN_K` — ¿3 (código actual) o 5
-      (documentado)? Presentar ambas opciones con su impacto (número de
-      candidatos A* evaluados, máximo de alternativas mostrables) y esperar
-      elección.
-- [ ] **Pregunta (b):** Frontend — confirmar (a la luz del resultado real de
-      la Fase 1, no de la hipótesis original de la auditoría) qué variante
-      queda como viva y cuál se retira/renombra. No renombrar ni borrar nada
-      sin esa confirmación explícita.
-- [ ] Tras respuesta: aplicar el cambio correspondiente en su propio commit,
-      con el mismo ciclo aprobación→cambio→doc→decisions.md→commit→verificación
-      que el resto de fases.
+- [x] **Pregunta (a):** `SHORTLIST_EUCLIDEAN_K` — **decidido: 5.**
+      Implementación diferida a la Fase 8 (ver `docs/decisions.md`).
+- [x] **Pregunta (b):** Frontend — **decidido: retirar
+      `index.html`/`app.js`/`styles.css`/los 3 `hamburg_mitte_*.geojson`,
+      reemplazar `README.md` por un aviso corto.** Implementación diferida
+      a un commit propio en la Fase 8, con precondición de verificación por
+      grep antes de borrar (ver `docs/decisions.md`).
+- [x] **Ítems adicionales tratados en esta fase, no previstos originalmente
+      en el plan** (añadidos por el usuario durante la ejecución, todos
+      registrados en `docs/decisions.md`):
+  - Mitigación del fallo silencioso en resultados vacíos — **decidido:
+      aprobado, primer ítem de la Fase 8**, con texto de cara al usuario
+      en borrador pendiente de revisión del equipo.
+  - Modo `car` (opciones i/ii/iii/iv) — medición completa entregada
+      (97,8% de cobertura con snap dependiente del modo, opción iv), pero
+      **decisión NO cerrada** — pendiente de consulta del usuario con su
+      equipo.
+  - Diagnóstico `PUBLIC_BASE_PATH` — confirmado como escenario no
+      soportado en absoluto; corrección de `README_deploy.md` diferida a
+      la Fase 8; riesgo de despliegue registrado junto al del puerto.
+- [x] Tras respuesta: los cambios correspondientes NO se aplican en esta
+      fase — todos diferidos a la Fase 8, según lo pidió el usuario
+      explícitamente ("no en esta fase ni junto a otros cambios").
 
 ---
 

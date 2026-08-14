@@ -283,3 +283,128 @@ alguien actualice esa configuración de Apache para que coincida. Verificar
 la configuración real del proxy inverso ANTES del próximo despliegue queda
 como acción pendiente explícita — no se puede cerrar como "hecho" solo con
 este commit.
+
+---
+
+## 2026-08-14 — Fase 4(a): `SHORTLIST_EUCLIDEAN_K` = 5, aprobado — implementación diferida a la Fase 8 — cierra: C6
+
+Aprobado subir `SHORTLIST_EUCLIDEAN_K` de 3 (código actual) a 5 (valor ya
+justificado en `docs/routing_methodology.md`, sección "Why K=5"). **No se
+implementa en esta fase.** Cuando se implemente en la Fase 8: cambiar
+`config.py`, y corregir en la documentación la afirmación de "Compare
+routes toggle showing up to 4 alternative routes" — con K=5, el máximo de
+4 alternativas solo se alcanza si las 5 búsquedas A* tienen éxito (ninguna
+descartada por `NetworkXNoPath` o snap fallido); no asumir "hasta 4" como
+un techo garantizado sin verificarlo contra el comportamiento real de
+`find_nearest_aeds` en ese momento.
+
+## 2026-08-14 — Fase 4(b): retirar `index.html`/`app.js` y reemplazar `README.md`, aprobado — implementación diferida a un commit propio en la Fase 8 — cierra: C1 (código huérfano), C9
+
+Aprobado retirar `static/index.html`, `static/app.js`, `static/styles.css`
+y los tres `static/data/hamburg_mitte_*.geojson` (el conjunto huérfano
+completo), y reemplazar el contenido de `README.md` por un aviso corto que
+remita a `README_deploy.md`. **No se ejecuta en esta fase, ni junto a
+ningún otro cambio — va en su propio commit dedicado en la Fase 8.**
+Precondición explícita antes de borrar en la Fase 8: verificar por grep en
+todo el árbol (incluido `scratch/`) que `styles.css` y los tres
+`hamburg_mitte_*.geojson` no los referencia nada más — esa verificación
+tampoco se hace en esta fase, es el primer paso de ese commit futuro, no
+un prerequisito ya cumplido.
+
+Pendiente, explícitamente del usuario y no de este agente: confirmar con
+su equipo si alguien tiene enlazada la URL `/static/index.html` desde
+fuera de este repositorio antes de borrar los archivos.
+
+## 2026-08-14 — Fase 4(c): mitigación del fallo silencioso en resultados vacíos, aprobada — pasa a ser el PRIMER ítem de la Fase 8 — cierra: hallazgo nuevo de UX (registrado 2026-08-14, ver entrada de smoke test)
+
+Aprobadas ambas partes, a implementar juntas en la Fase 8 como primer paso
+(antes que cualquier otro cambio de esa fase):
+1. Mensaje explícito en `renderPanel()` (`static/app_original.js:132-133`)
+   cuando `state.results.length === 0`, en vez de reutilizar el hint
+   genérico pre-click. Cubre Car, clicks sobre agua, y clicks fuera de
+   `MAX_SNAP_DISTANCE_M` con el mismo mensaje.
+2. Botón "Car" deshabilitado visualmente con una nota, hasta que exista una
+   solución real (Fase 8 más allá de este primer paso, o posterior).
+
+**Texto de cara al usuario — BORRADOR, pendiente de revisión del equipo
+antes de publicarse, NO aprobado para producción todavía:**
+
+> "No AED could be reached from here by [mode]. Try Walk or Bike, or call
+> emergency services if this is urgent."
+
+(para el botón Car deshabilitado, nota corta junto al botón, también
+borrador:)
+
+> "Car routing temporarily unavailable"
+
+Ninguno de los dos textos está aprobado — se preparan aquí solo para que
+el equipo tenga algo concreto sobre lo que opinar, no para implementarse
+tal cual.
+
+## 2026-08-14 — Fase 4(d): modo `car` — recomendación (iv) aceptada como DIRECCIÓN, decisión NO cerrada, pendiente de consulta con el equipo del usuario
+
+**Verificación previa solicitada por el usuario, resuelta:** el conteo de
+314.640 componentes en el subgrafo `car` es, tal como sospechaba el
+usuario, un artefacto de `subgraph_view` + `connected_components`:
+313.945 de esas 314.640 componentes (99,8%) son nodos aislados de tamaño 1
+(nodos sin ninguna arista `can_drive`, que `subgraph_view` conserva como
+nodos del grafo aunque pierdan todas sus aristas). Solo 695 componentes
+tienen 2 o más nodos. **La métrica principal (nearest_node de AED dentro
+del componente gigante) se recalculó contando solo componentes de 2+
+nodos y el resultado se mantiene exactamente igual: 58/139 = 41,7%** — no
+era un artefacto, es un dato real. Desglose completo de los 139
+`nearest_node` de AED: 58 (41,7%) en el componente gigante; 3 (2,2%) en
+otro fragmento drivable pequeño y aislado; 78 (56,1%) sin ninguna arista
+`can_drive` en absoluto (nodos puramente peatonales/ciclistas).
+
+**Medición pedida — nodo drivable dentro de `MAX_SNAP_DISTANCE_M` (100 m),
+con snap dependiente del modo (opción iv), CRS reproyectado correctamente
+a metros (no reutilizando el bug de unidades de C2):**
+
+| Universo de snap para `car` | AEDs con nodo drivable ≤100 m | Distancia resultante (de los que sí tienen) |
+|---|---|---|
+| Restringido al componente gigante `car` (el que de verdad importa para (iv)) | **136 / 139 (97,8%)** | media 29,4 m, máxima 94,8 m, mínima 2,6 m |
+| Cualquier nodo con arista `can_drive` (incluye fragmentos aislados pequeños, no recomendado como base real de (iv)) | 138 / 139 (99,3%) | media 29,7 m, máxima 95,3 m, mínima 2,6 m |
+
+Referencia: snap peatonal actual, media ~17,3 m, máxima 60,0 m.
+
+**Esto cambia sustancialmente el diagnóstico frente al 41,7% inicial**: el
+41,7% mide si el `nearest_node` YA elegido (sin filtro de modo, snap
+peatonal) coincide por casualidad con la red drivable — un número bajo
+porque nunca se buscó allí. Si en cambio se hace un snap propio para
+`car`, restringido al componente gigante drivable (que es exactamente lo
+que propone la opción iv), la cobertura sube a **97,8%** (136 de 139
+AEDs), con distancias de acceso razonables (media 29,4 m, siempre por
+debajo de `MAX_SNAP_DISTANCE_M`). Solo 3 AEDs quedarían sin ningún nodo
+drivable dentro de 100 m incluso con este enfoque — candidatos a una
+excepción documentada individual o a un radio de snap mayor solo para
+`car`, a decidir en la Fase 8.
+
+**Decisión NO cerrada.** La opción (iv) queda aceptada como dirección de
+diseño, pero su implementación y el compromiso de producto que implica
+(cobertura del 97,8%, no del 100%) se consultan con el equipo del usuario
+antes de proceder. La medición de esta entrada es la que se necesitaba
+para que esa conversación sea informada.
+
+## 2026-08-14 — Diagnóstico `PUBLIC_BASE_PATH` confirmado como escenario NO soportado en absoluto — corrección de `README_deploy.md` diferida a la Fase 8 — riesgo de despliegue explícito
+
+Confirmado (ver mensaje de la Fase 4, Paso 2): `app/app.py` instancia
+`FastAPI()` sin `root_path`, sin middleware, sin lectura de cabeceras
+`X-Forwarded-*`; todas las rutas están registradas en su path exacto. Si
+el proxy inverso real reenvía la petición SIN eliminar el prefijo público
+(el modo "PUBLIC_BASE_PATH" que describe `README_deploy.md`), el backend
+recibe la ruta con el prefijo intacto y devuelve 404 en TODAS las rutas,
+incluida la página raíz — no es un caso de "funciona por accidente del
+frontend", **no funciona en absoluto, ni siquiera se llega a servir el
+HTML**. La corrección de `README_deploy.md` para documentar esto
+correctamente (marcar el escenario como no soportado) queda diferida a la
+Fase 8.
+
+**Riesgo de despliegue explícito, junto con el del puerto (ver entrada de
+Fase 3b):** antes del próximo despliegue real en el servidor de HCU hay
+que verificar DOS cosas contra la configuración real de Apache — (1) que
+efectivamente escucha/reenvía al puerto 5000 y no 5050, y (2) que el modo
+de proxy configurado SÍ elimina el prefijo público antes de reenviar (no
+el modo "PUBLIC_BASE_PATH"). Si cualquiera de las dos no se cumple, la
+aplicación no arrancará o no será accesible tras este trabajo de
+remediación.
