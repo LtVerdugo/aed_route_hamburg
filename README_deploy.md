@@ -118,10 +118,10 @@ The recommended public URL is:
   https://www.cml.hcu-hamburg.de/demos/aed-routing/
 
 Do not publish the app as `/demos/aed-routing/static/`. The `static/`
-folder is an implementation detail; users should land on the Flask index
-route.
+folder is an implementation detail; users should land on the FastAPI index
+route (`GET /`, `app/app.py`).
 
-If nginx strips the public prefix before forwarding to Gunicorn, no extra
+If nginx strips the public prefix before forwarding to uvicorn, no extra
 environment variable is needed:
 
 ```nginx
@@ -133,8 +133,12 @@ location /demos/aed-routing/ {
 }
 ```
 
-If the reverse proxy forwards the prefix through to Flask unchanged, start
-Gunicorn with `PUBLIC_BASE_PATH`:
+If the reverse proxy forwards the prefix through unchanged, start uvicorn
+with `PUBLIC_BASE_PATH` (note, added 2026-08-14: `PUBLIC_BASE_PATH` is not
+actually read anywhere in this repo's code — verified by grep against
+`app/` and `src/`. This whole paragraph describes a configuration mode that
+does not exist today; not fixed further in this pass, flagged for later
+triage):
 
 ```bash
 uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload

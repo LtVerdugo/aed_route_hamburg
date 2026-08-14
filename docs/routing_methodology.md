@@ -415,7 +415,7 @@ network-nearest AED.
 
 Walk isochrones are precomputed for each AED and cached
 as a GeoJSON file (data/processed/hamburg_isochrones_walk.geojson).
-They are loaded at Flask startup and served via /api/isochrones.
+They are loaded at FastAPI startup and served via /api/isochrones.
 
 **Method:**
 For each AED node and each time threshold, all reachable nodes
