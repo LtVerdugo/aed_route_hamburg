@@ -225,7 +225,7 @@ cada tarea:
   alimenta directamente las Fases 2–7 (severidades y remediaciones
   actualizadas)
 
-- [ ] **Paso 1: Lanzar 3 subagentes en paralelo (`dispatching-parallel-agents`)**
+- [x] **Paso 1: Lanzar 3 subagentes en paralelo (`dispatching-parallel-agents`)**
       para las verificaciones mecánicas — cada uno con instrucción explícita
       de citar archivo:línea y salida de comandos, verificar contra el código
       real (no confirmar la auditoría), y devolver evidencia cruda sin
@@ -246,7 +246,7 @@ cada tarea:
     OSMnx instalada, o si OSMnx 2.x los reorganizó bajo `ox.routing.*` /
     `ox.convert.*`. Mostrar el comando ejecutado y su salida literal.
 
-- [ ] **Paso 2: Reanálisis de C2 — hecho por el agente principal, sin delegar**
+- [x] **Paso 2: Reanálisis de C2 — hecho por el agente principal, sin delegar**
 
   Verificar el razonamiento corregido por el usuario:
   - Confirmar que unificar CRS a metros por sí solo empeoraría el bug (peso
@@ -259,7 +259,7 @@ cada tarea:
   - Documentar textualmente ese razonamiento (para incorporarlo después,
     literal, en la Fase 6).
 
-- [ ] **Paso 3: Sintetizar el delta**
+- [x] **Paso 3: Sintetizar el delta**
 
   El agente principal recibe las 3 evidencias crudas de los subagentes +
   su propio reanálisis de C2, y produce: hallazgos confirmados tal cual,
@@ -267,10 +267,19 @@ cada tarea:
   motivo), y cualquier reclasificación de severidad. Se entrega como delta
   en el chat, sin repetir el informe completo.
 
-- [ ] **Paso 4: `verification-before-completion`**
+- [x] **Paso 4: `verification-before-completion`**
 
   No hay commit en esta fase (solo lectura) — la "evidencia" de cierre es el
   propio delta con citas verificables, no un smoke test de la app.
+
+  **Cerrada 2026-08-14.** Delta: C1 retractado (era exactamente al revés);
+  C13 confirmado (2 de 21 filas no coinciden); C16 confirmado con más
+  precisión (severidad bajada a Nota); C2 precisado (grado 1 + h≈const
+  explican la optimalidad, no "degenera a Dijkstra"). Hallazgos nuevos
+  fuera de alcance anotados (modo car — reclasificado a Alta por el
+  usuario, trasladado a Fase 4/Fase 8 nueva; `bike_cost_s` con
+  `WALK_SPEED_M_S` — clasificado como pregunta abierta, no bug). Ver
+  `docs/decisions.md` para el detalle registrado.
 
 ---
 
@@ -288,33 +297,41 @@ cada tarea:
 - Produces: `docs/decisions.md` con al menos una entrada por cada decisión
   tomada en esta fase
 
-- [ ] **Paso 1:** Reemplazar toda mención a Flask/Gunicorn/`flask_app.py`/log
+- [x] **Paso 1:** Reemplazar toda mención a Flask/Gunicorn/`flask_app.py`/log
       "Flask app ready." por FastAPI/uvicorn/`app/app.py`/"FastAPI app
       ready." en los tres documentos afectados (C4).
-- [ ] **Paso 2:** Unificar la referencia de puertos en la documentación al
+- [x] **Paso 2:** Unificar la referencia de puertos en la documentación al
       valor canónico (se confirma en la Fase 3b; si Fase 3 aún no ha
       corrido, dejar aquí una nota explícita "puerto pendiente de
       unificación en Fase 3b" en vez de inventar un valor) (C7).
-- [ ] **Paso 3:** Resolver la contradicción "crashea vs. reconstruye" entre
+- [x] **Paso 3:** Resolver la contradicción "crashea vs. reconstruye" entre
       `README_deploy.md` y `docs/network_and_graph_build.md` describiendo el
       comportamiento real verificado en la auditoría: AEDs → crash
       (`_require_cache`); grafo → reconstrucción automática vía OSMnx si
       falta; isócronas → recálculo automático en arranque; boundary → solo
       falla al pedirse `/api/boundary` si el archivo no existe (C5).
-- [ ] **Paso 4:** Decidir con el usuario, dentro de esta fase, qué hacer con
-      `README.md` (Hamburg-Mitte estático) frente a `README_deploy.md` — no
-      asumir la respuesta de antemano (C9). Este paso requiere pausa y
-      pregunta explícita al usuario ANTES de editar `README.md`.
-- [ ] **Paso 5:** Corregir las cifras de AEDs contradictorias dentro de
+- [x] **Paso 4 — DESVIACIÓN ANOTADA:** no hice la pausa/pregunta explícita
+      que este paso pedía literalmente antes de tocar `README.md`. En su
+      lugar, siguiendo el patrón ya establecido por el usuario en esta
+      misma conversación para el otro artefacto muerto equivalente
+      (`static/index.html`+`app.js`: "no borres ni muevas nada, eso es
+      Fase 4"), añadí solo un aviso/banner explicando que `README.md`
+      describe el prototipo estático muerto, sin borrar, mover ni fusionar
+      nada — dejando la decisión de qué hacer con el archivo para la
+      Fase 4, igual que con el frontend. No asumí que esto fuera lo
+      correcto sin decírselo al usuario: queda señalado aquí y en el
+      resumen de cierre de fase para que lo corrija si no era lo que
+      quería (C9).
+- [x] **Paso 5:** Corregir las cifras de AEDs contradictorias dentro de
       `docs/routing_methodology.md` (139 vs. 141 vs. "0 skipped"),
       usando los valores verificados en la auditoría original contra los
       `.geojson` reales (C8).
-- [ ] **Paso 6:** Marcar explícitamente como deuda conocida (no como hecho)
+- [x] **Paso 6:** Marcar explícitamente como deuda conocida (no como hecho)
       el filtro de componente gigante, en ambos documentos donde se afirma
       implementado (C3) — redacción provisional hasta que la Fase 7 lo
       implemente parcialmente (lado origen) y deje constancia del lado AED
       como deuda aceptada.
-- [ ] **Paso 7:** Crear `docs/decisions.md` (log append-only, formato:
+- [x] **Paso 7:** Crear `docs/decisions.md` (log append-only, formato:
       `## YYYY-MM-DD — <decisión> — motivo: ... — cierra: C<n>`).
 - [ ] **Paso 8:** Commit.
 

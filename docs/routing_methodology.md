@@ -116,9 +116,9 @@ at query time.
 | OSM highway    | Walk | Bike | Car | Notes                                                        |
 |----------------|------|------|-----|--------------------------------------------------------------|
 | motorway       | No   | No   | Yes | High-speed motor road. Excluded for safety, not convention   |
-| motorway_link  | No   | No   | Yes | Motorway on/off ramp. Excluded for safety                    |
+| motorway_link  | Yes  | No   | Yes | Motorway on/off ramp. Included for walk (verified in `WALK_CUSTOM_FILTER`); excluded for bike |
 | trunk          | No   | No   | Yes | High-capacity road. Excluded for safety                      |
-| trunk_link     | No   | No   | Yes | Trunk on/off ramp. Excluded for safety                       |
+| trunk_link     | Yes  | No   | Yes | Trunk on/off ramp. Included for walk (verified in `WALK_CUSTOM_FILTER`); excluded for bike |
 | primary        | Yes  | Yes  | Yes | Major urban road                                             |
 | primary_link   | Yes  | Yes  | Yes | Primary connector ramp. Included in emergency context        |
 | secondary      | Yes  | Yes  | Yes | District connector road                                      |
@@ -139,10 +139,19 @@ at query time.
 
 *Included for car via custom_filter in emergency context.
 All classes subject to access=no/private exclusions.
-motorway, motorway_link, trunk and trunk_link excluded for all
-non-car modes due to physical danger at high speeds — the only
+
+**Correction (2026-08-14):** this table previously marked `motorway_link`
+and `trunk_link` as `No` for Walk. Verified directly against
+`WALK_CUSTOM_FILTER` in `src/aed_route/graph_builder_osm.py`: both terms are
+literally present in that filter's regex, so both are in fact included for
+walking. The prose in this document (below, and in the "OSMnx Network
+Download and Custom Filter" section) was already correct on this point —
+only these two table cells were wrong. `motorway` and `trunk` themselves
+(without the `_link` suffix) remain correctly excluded for walk, as the
+table now shows: only the base `motorway`/`trunk` classes are excluded for
+all non-car modes due to physical danger at high speeds — the only
 restrictions maintained for safety reasons rather than
-behavioural conventions.
+behavioural conventions. `_link` ramps are not excluded for walk.
 
 ---
 
@@ -311,14 +320,21 @@ This design ensures that:
 - the access edge geometry is rendered as part of the route
 - no special-case resolution is needed at query time
 
-**Empirical results — 141 AEDs:**
+**Empirical results (corrected 2026-08-14 — verified against the actual
+cached data, not the figures previously in this table):**
 
-| Metric                                  | Value      |
-|-----------------------------------------|------------|
-| AED nodes added to graph                | 141        |
-| AED nodes skipped (beyond 100 m limit)  | 0          |
-| Mean access edge length                 | 17.3 m     |
-| Maximum access edge length              | 60.0 m     |
+| Metric                                            | Value      |
+|----------------------------------------------------|------------|
+| AEDs in source (`data/processed/hamburg_aeds.geojson`) | 141    |
+| AED nodes added to graph                          | 139        |
+| AED nodes skipped (beyond `MAX_SNAP_DISTANCE_M` = 100 m) | 2    |
+| Mean access edge length                           | 17.3 m     |
+| Maximum access edge length                        | 60.0 m     |
+
+The mean/maximum access edge length figures above were not re-verified in
+this correction pass (doing so would require loading the 364 MB graph
+bundle and recomputing them; they are left as previously recorded, not
+independently re-confirmed).
 
 **Origin snapping** is performed at query time. The user's
 click coordinates are projected to EPSG:25832 and snapped to
@@ -432,9 +448,13 @@ a pending task in Open Questions and Pending Decisions.
 - Both layers toggled via "Show/Hide isochrones" button in the panel
 - Isochrones are static — precomputed at build time, not per query
 
-**Empirical results:**
-- AEDs with isochrones: 138 of 139 (one AED in disconnected component)
-- Features generated: 278 (139 × 2 time thresholds, minus 2 skipped)
+**Empirical results (corrected 2026-08-14 — verified directly against the
+current cached file, `data/processed/hamburg_isochrones_walk.geojson`):**
+- Features in cache: 278, confirmed to be exactly 139 unique AED ids × 2
+  time thresholds, with no shortfall — i.e. **all 139 AED graph nodes have
+  both isochrones**, not "138 of 139" as this section previously claimed.
+  That earlier figure does not match the data currently cached; it may have
+  reflected an older AED dataset or graph build, but is not accurate today.
 - Cache file size: ~1 MB
 
 ---
@@ -452,8 +472,24 @@ The unified graph may contain small isolated components
 disconnected from the main network. These typically represent
 private access roads, dead-end service paths, or minor OSM
 mapping gaps. AEDs or origin points falling in these components
-require snapping to the nearest node within the giant component
-before routing.
+ideally require snapping to the nearest node within the giant component
+before routing — **this is not implemented today** (corrected 2026-08-14;
+see the "AED snap restricted to giant component" entry below, which
+previously described this as already done).
+
+**Car mode cannot route to any AED, in any origin, ever (known structural
+limitation, added 2026-08-14):**
+The access edge that connects every AED node to the road network is built
+with `can_drive=False` unconditionally (`add_aed_nodes_to_graph` in
+`src/aed_route/graph_builder_osm.py`). Since this is the only edge into an
+AED node, the `car` subgraph view has zero in-degree at every AED node —
+`POST /api/route` with `mode="car"` therefore returns an empty result list
+for every possible origin, not just in specific unreachable areas. This is
+tracked as a severity-High finding pending a product decision among three
+options (make the access edge drivable, route car to the nearest road node
+instead of the AED node itself, or remove the car mode from the UI until
+resolved) — see `docs/decisions.md` for the full comparison. Not
+implemented in this pass.
 
 **OSMnx network coverage:**
 OSMnx applies standard OSM access filters that may exclude some
@@ -470,13 +506,24 @@ different street than expected. This is a known limitation
 of the nearest-node approach and affects only cases where
 OSM has not mapped intermediate vertices on a segment.
 
-**AED snap restricted to giant component:**
-AED nodes are snapped only to nodes within the giant weakly
-connected component of the unified graph. This prevents AEDs
-from being connected to isolated road fragments that A* cannot
-reach from most origins. As a result, AEDs whose nearest road
-node belongs to a small disconnected component are connected
-to a different node that is reachable from the main network.
+**AED snap NOT restricted to giant component — known gap, not yet fixed
+(corrected 2026-08-14):**
+This section previously claimed that AED nodes are snapped only to nodes
+within the giant weakly connected component of the unified graph. That is
+not what the code does: `add_aed_nodes_to_graph`
+(`src/aed_route/graph_builder_osm.py`) builds its snapping `cKDTree` over
+*all* road nodes, with no connectivity filter — verified directly against
+the function body, and confirmed there is no `connected_components`/
+`weakly_connected` check anywhere in `graph_builder_osm.py` or
+`routing.py`. In practice, an AED whose nearest road node belongs to a
+small disconnected component gets connected to that unreachable node, and
+`find_nearest_aeds` will silently drop it as a candidate whenever
+`nx.astar_path` raises `NetworkXNoPath` — with no log entry today, so this
+failure mode is invisible unless investigated directly. Origin-side
+filtering to the giant component is planned for a later remediation phase;
+because the graph itself (including AED access edges) is not rebuilt as
+part of this remediation, the AED side of this gap is accepted as known
+technical debt rather than fixed — see `docs/decisions.md`.
 
 ## Routing Logic Summary
 
@@ -489,19 +536,40 @@ or parks.
 
 ## Application Architecture
 
-The routing model is served via a Flask web application
-with a Leaflet.js frontend.
+The routing model is served via a **FastAPI** web application (run with
+`uvicorn`) with a Leaflet.js frontend. (Corrected 2026-08-14 — this section
+previously said "Flask"; the code has always been FastAPI, see `app/app.py`.)
 
-**Backend (Flask):**
-- Loads the graph bundle, AED index and node index once
-  at startup (~20-30 seconds)
-- Exposes four endpoints:
-  - GET / — serves the HTML frontend
+**Backend (FastAPI):**
+- Loads the graph bundle, AED index and node index once at startup. In
+  practice, with the cache files already present, this takes roughly 5
+  seconds (measured directly against this repo's cached data, not the
+  "20-30 seconds" previously claimed here). If `hamburg_graph.pkl` is
+  missing, startup instead triggers a live OSMnx rebuild, which is much
+  slower and depends on network conditions — see `README_deploy.md`.
+- Exposes these endpoints:
+  - GET / — serves the live HTML frontend
+    (`static/index_original.html` + `static/app_original.js` — see the note
+    on frontend variants below; the other pair, `static/index.html` +
+    `static/app.js`, is an unlinked older prototype, not served here)
   - GET /api/aeds — returns the AED GeoJSON
   - GET /api/boundary — returns the Hamburg boundary GeoJSON
   - GET /api/isochrones — returns precomputed walk isochrones GeoJSON
   - POST /api/route — receives origin coordinates and mode,
     runs A* routing, returns serialized results as JSON
+
+**Note on frontend variants (added 2026-08-14, verified against the
+current code):** `static/` contains two complete HTML+JS pairs.
+`index_original.html` + `app_original.js` is the **live** one — it is what
+`GET /` actually serves, and it is fully connected to the backend described
+above (mode selector, click-to-route via `POST /api/route`, AED/boundary/
+isochrone layers loaded via the `/api/*` endpoints through a base-path-aware
+`apiUrl()` helper). `index.html` + `app.js` is an **older, unlinked
+prototype**: no backend calls at all, a hardcoded demo response, and
+Hamburg-Mitte-only GeoJSON loaded from `static/data/`. It is not served at
+any route in `app/app.py` and is only reachable by navigating directly to
+`/static/index.html`. What to do with this unlinked pair (keep, archive, or
+remove) is a pending product decision, not yet made.
 
 **Frontend (Leaflet.js):**
 - Full-screen map with CartoDB Positron basemap
@@ -523,9 +591,15 @@ with a Leaflet.js frontend.
 - Nearest AED: green circle marker at AED position
 
 **Startup command:**
-.venv\Scripts\python app/flask_app.py
+.venv/bin/uvicorn app.app:app --host 0.0.0.0 --port <port>
 
-Access at: http://127.0.0.1:5050
+(Corrected 2026-08-14 — there is no `app/flask_app.py` in this repo; the
+entry point is `app/app.py`, run via uvicorn, not a direct `python
+app/flask_app.py` invocation. The exact `<port>` value is currently
+inconsistent across this repo's own files — see `docs/decisions.md` — and
+is pending unification in a later remediation phase. Do not assume 5050 or
+5000 without checking `app/app.py`'s current default and your reverse
+proxy configuration.)
 
 ---
 
@@ -587,3 +661,15 @@ before implementation:
   are based on general knowledge of cardiac arrest survival rates.
   These should be validated against clinical literature before
   use in operational planning.
+
+- **AED access-edge speed for bike mode (added 2026-08-14):** the access
+  edge connecting an AED to the road network uses `WALK_SPEED_M_S` for its
+  `bike_cost_s` value too (`add_aed_nodes_to_graph`,
+  `src/aed_route/graph_builder_osm.py`), not `BIKE_SPEED_M_S`. This is
+  **not classified as a bug** — it may intentionally model dismounting and
+  covering the last few metres to the AED on foot, which is a reasonable
+  real-world behaviour for a cyclist reaching a defibrillator. It is
+  recorded here as an open methodology question because the intent was not
+  documented anywhere at the time this was found: confirm with the team
+  whether this is deliberate, and if so, document it explicitly as a
+  modelling choice rather than leaving it implicit in the code.

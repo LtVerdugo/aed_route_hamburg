@@ -140,8 +140,12 @@ graph node via a bidirectional access edge.
 
 **Result:**
 - AED nodes added: 139
-- AED nodes skipped (beyond MAX_SNAP_DISTANCE_M or 
-  outside giant component): 2
+- AED nodes skipped (beyond MAX_SNAP_DISTANCE_M): 2
+  (corrected 2026-08-14 — the previous wording here also cited "or outside
+  giant component" as a skip reason; verified directly against
+  `add_aed_nodes_to_graph` that `MAX_SNAP_DISTANCE_M` is the only skip
+  condition implemented — there is no giant-component check anywhere in
+  this file. See the "Giant component constraint" note below.)
 - Graph nodes after integration: 658,009
 - Graph edges after integration: 1,472,241
 
@@ -151,12 +155,21 @@ Integrating AEDs permanently into the graph means:
 - Access edge geometry is drawn as part of the route
 - No special-case logic needed at query time
 
-**Giant component constraint:**
-AED nodes are snapped only to nodes within the giant weakly
-connected component of the unified graph. This ensures that
-every AED node is reachable from any origin point in the main
-network. Nodes in small isolated components are excluded from
-the snap candidates even if they are within MAX_SNAP_DISTANCE_M.
+**Giant component constraint — NOT implemented, known gap (corrected
+2026-08-14):**
+This section previously claimed that AED nodes are snapped only to nodes
+within the giant weakly connected component of the unified graph. Verified
+directly against `add_aed_nodes_to_graph`
+(`src/aed_route/graph_builder_osm.py`): the snapping `cKDTree` is built
+over *all* road nodes in `nodes_df`, with no connectivity/component filter
+of any kind — there is no `connected_components` or `weakly_connected`
+check anywhere in this file. An AED whose nearest road node happens to be
+in a small disconnected component is connected to that node anyway, not
+excluded from snapping. Origin-side filtering to the giant component is
+planned for a later remediation phase; the AED side of this gap requires
+rebuilding the graph's AED access edges and is accepted as known technical
+debt for now (the graph is treated as immutable in the current remediation
+effort) — see `docs/decisions.md`.
 
 ---
 
@@ -189,11 +202,18 @@ and validated:
 - AED snap restricted to giant weakly connected component
 - Graph topology validated empirically (94.5% walk, 98.2% bike,
   43.9% drive coverage)
-- AED and origin snapping (nearest-node, giant component only)
-- Candidate selection (K=5 Euclidean prefilter + A* per candidate)
+- AED and origin snapping (nearest-node; giant-component filtering NOT yet
+  implemented — see the "Giant component constraint" note above)
+- Candidate selection (Euclidean prefilter + A* per candidate — the exact K
+  value is currently inconsistent between code and documentation; see
+  `docs/decisions.md`, pending resolution)
 - Route visualisation (green solid + grey dashed alternatives)
-- Flask + Leaflet.js web application
+- FastAPI + Leaflet.js web application (corrected 2026-08-14 — this line
+  previously said "Flask"; the code has always been FastAPI, see
+  `app/app.py`)
 
-The application is served via a Flask development server on
-port 5050. The graph bundle is loaded once at startup and
-reused for all routing queries.
+The application is served via **uvicorn** (not a Flask development server).
+The port used across this repo's own files is currently inconsistent
+(5000 in most deployment files, 5050 in `app/app.py`'s own `__main__`
+block) — see `docs/decisions.md`, pending unification. The graph bundle is
+loaded once at startup and reused for all routing queries.
