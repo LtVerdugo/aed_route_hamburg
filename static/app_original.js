@@ -11,6 +11,19 @@ const state = {
   isochronesVisible: false,
 };
 
+// ── Textos de interfaz — BORRADOR, pendiente de aprobación del equipo ──
+// (ver docs/decisions.md, Fase 8A(1), 2026-08-14). Cambiar SOLO estas
+// cadenas aquí no requiere tocar ninguna lógica de renderPanel(),
+// showNoResults() ni el resto del archivo — ese es el propósito de
+// aislarlas en este objeto.
+const UI_COPY = {
+  // {mode} se sustituye por "walk"/"bike"/"car" en tiempo de ejecución.
+  noResults:
+    "No AED could be reached from here by {mode}. Try Walk or Bike, " +
+    "or call emergency services if this is urgent.",
+  carDisabledNote: "Car routing temporarily unavailable",
+};
+
 const APP_BASE = (() => {
   const path = window.location.pathname.replace(/\/index\.html$/, "");
   const staticIndex = path.indexOf("/static");
@@ -86,6 +99,19 @@ document.querySelectorAll(".mode-btn").forEach((btn) => {
   });
 });
 
+// Car deshabilitado (ver docs/decisions.md, Fase 8A(1)): sin cobertura
+// real hoy (ver Fase 4/decisions.md sobre el modo car). El botón ya
+// lleva el atributo `disabled` en el HTML — un botón disabled no
+// dispara "click", así que no hace falta tocar el handler de arriba.
+// Solo se pone aquí el texto (desde UI_COPY, no repetido a mano) como
+// tooltip y como nota visible permanente.
+{
+  const carBtn = document.getElementById("btn-mode-car");
+  if (carBtn) carBtn.title = UI_COPY.carDisabledNote;
+  const carNote = document.getElementById("car-disabled-note");
+  if (carNote) carNote.textContent = UI_COPY.carDisabledNote;
+}
+
 // ── Compare toggle ─────────────────────────────────────────────
 document.getElementById("btn-compare").addEventListener("click", () => {
   state.showAlternatives = !state.showAlternatives;
@@ -130,10 +156,21 @@ map.on("click", async (e) => {
 
 // ── Render panel ───────────────────────────────────────────────
 function renderPanel() {
-  if (!state.results.length) { showHint(); return; }
+  // Antes de la Fase 8A esto llamaba a showHint(), reutilizando el mismo
+  // texto genérico de "haz click en el mapa" que se ve ANTES de cualquier
+  // click — un usuario no podía distinguir "no has hecho click todavía"
+  // de "hiciste click y no hay ruta" (ver docs/decisions.md, Fase 8A(1)).
+  // Cubre por igual los tres casos legítimos de "sin resultados" que
+  // llegan idénticos desde el backend (results: [] en los tres): un
+  // click sobre agua, un click a más de MAX_SNAP_DISTANCE_M de cualquier
+  // nodo, y un origen fuera del componente gigante (Fase 7) — el backend
+  // no distingue el motivo en la respuesta, así que el frontend tampoco
+  // necesita hacerlo aquí.
+  if (!state.results.length) { showNoResults(); return; }
 
   document.getElementById("hint").style.display = "none";
   document.getElementById("loading").style.display = "none";
+  document.getElementById("no-results").style.display = "none";
   document.getElementById("results").style.display = "block";
 
   const best = state.results[0];
@@ -332,14 +369,30 @@ function showAedPin(r) {
 // ── UI helpers ─────────────────────────────────────────────────
 function showLoading() {
   document.getElementById("hint").style.display = "none";
+  document.getElementById("no-results").style.display = "none";
   document.getElementById("results").style.display = "none";
   document.getElementById("loading").style.display = "block";
 }
 
 function showHint() {
   document.getElementById("hint").style.display = "block";
+  document.getElementById("no-results").style.display = "none";
   document.getElementById("results").style.display = "none";
   document.getElementById("loading").style.display = "none";
+}
+
+// Fase 8A(1), 2026-08-14: distinta de showHint() a propósito -- esta se
+// usa SOLO cuando hubo un click y el backend respondió con results: []
+// (agua / fuera de MAX_SNAP_DISTANCE_M / fuera del componente gigante,
+// ver renderPanel()), no antes de cualquier click. Texto en UI_COPY,
+// borrador pendiente de aprobación del equipo.
+function showNoResults() {
+  const el = document.getElementById("no-results");
+  el.textContent = UI_COPY.noResults.replace("{mode}", state.mode);
+  document.getElementById("hint").style.display = "none";
+  document.getElementById("results").style.display = "none";
+  document.getElementById("loading").style.display = "none";
+  el.style.display = "block";
 }
 
 // ── Load and draw Hamburg boundary ────────────────────────────

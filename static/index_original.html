@@ -57,8 +57,12 @@
     <div class="mode-row">
       <button class="mode-btn active" data-mode="walk">🚶 Walk</button>
       <button class="mode-btn" data-mode="bike">🚲 Bike</button>
-      <button class="mode-btn" data-mode="car">🚗 Car</button>
+      <!-- disabled: modo car sin cobertura real hoy (ver docs/decisions.md,
+           Fase 8A(1), 2026-08-14) -- title/nota puestos por JS desde
+           UI_COPY para no duplicar el texto en dos sitios. -->
+      <button class="mode-btn" data-mode="car" id="btn-mode-car" disabled>🚗 Car</button>
     </div>
+    <div id="car-disabled-note" class="mode-note"></div>
   </div>
 
   <!-- Route -->
@@ -66,6 +70,7 @@
     <div class="section-label">Route</div>
     <div id="hint">Click on the map to find the nearest AED.</div>
     <div id="loading">Calculating route…</div>
+    <div id="no-results" style="display:none"></div>
     <div id="results">
       <div id="result-best"></div>
       <button id="btn-compare">Compare routes</button>

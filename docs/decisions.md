@@ -837,3 +837,42 @@ el hash de commit y el texto de `note` en `MANIFEST.json`, ambos
 actualizaciones intencionadas de esta revisión). Arranque verificado en
 vivo: mismo comportamiento exacto que antes del refactor (mismos logs,
 mismos 9 AEDs, mismo WARNING).
+
+---
+
+## 2026-08-14 — Fase 8A(1): mitigación del fallo silencioso implementada — cierra: hallazgo del fallo silencioso (registrado en la verificación visual de Fase 5/6)
+
+**Implementado en el frontend vivo** (`static/index_original.html`,
+`static/app_original.js`, `static/styles_original.css` — confirmado de
+nuevo que estos son los archivos servidos en `/`, no los huérfanos):
+
+1. Nuevo elemento `#no-results`, distinto de `#hint` (que antes se
+   reutilizaba también para "sin resultados", impidiendo distinguir
+   "no has hecho click" de "hiciste click y no hay ruta"). `renderPanel()`
+   ahora llama a `showNoResults()` en vez de `showHint()` cuando
+   `state.results.length === 0`.
+2. Botón "Car" deshabilitado (`disabled` en el HTML — un botón disabled no
+   dispara `click`, no hizo falta tocar el handler del selector de modo),
+   con una nota permanente visible (`#car-disabled-note`) y `title` como
+   tooltip, ambos con el mismo texto.
+3. **Texto aislado en `UI_COPY`** (`static/app_original.js`), marcado
+   explícitamente en el propio código como BORRADOR pendiente de
+   aprobación del equipo, con el texto exacto que ya estaba en borrador
+   en esta misma entrada (Fase 4(c), 2026-08-14) — sin redactarlo de
+   nuevo. Cambiar el texto solo requiere editar las cadenas de `UI_COPY`,
+   sin tocar `renderPanel()`, `showNoResults()` ni ninguna otra lógica.
+
+**Verificado que la nueva rama cubre los tres casos legítimos de "sin
+resultados"**, pedido explícitamente: consultado `POST /api/route` en
+vivo para agua (53.5080, 9.9350), Clausewitz-Kaserne/fuera de
+`MAX_SNAP_DISTANCE_M` (53.5624, 9.8327), y un origen fuera del componente
+gigante sin flip (53.577362, 9.881057) — los tres devuelven exactamente
+`{"results": []}`, la misma forma exacta que consume
+`renderPanel()`. El backend no distingue el motivo en la respuesta, así
+que una única rama en el frontend basta para los tres — no fue necesario
+(ni se intentó) que el frontend adivinara la causa.
+
+Verificado también que el camino de éxito no se rompió (mismo resultado
+exacto que antes, 165.8s en `dense_urban`) y que los 20 tests de backend
+siguen en verde (este cambio es puramente de frontend, no debería
+afectarlos, y no lo hizo).

@@ -103,18 +103,36 @@ html, body {
   border-color: #16a34a;
 }
 
+.mode-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.mode-btn:disabled:hover {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+.mode-note {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
 /* ── Route section ─────────────────────────────────────────────── */
-#hint, #loading {
+#hint, #loading, #no-results {
   color: #9e9e9e;
   font-size: 13px;
   margin-top: 8px;
 }
 
-#hint {
+#hint, #no-results {
   line-height: 1.5;
 }
 
 #loading { display: none; }
+#no-results { display: none; }
 #results { display: none; }
 
 /* ── Result cards ──────────────────────────────────────────────── */
