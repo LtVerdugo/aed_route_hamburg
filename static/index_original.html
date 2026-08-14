@@ -26,7 +26,7 @@
     </div>
     <div class="help-item">
       <span class="help-icon">🚶</span>
-      <div><strong>Choose your transport mode</strong><br>Select Walk, Bike or Car in the Transport panel before clicking. Each mode uses different road rules and speeds.</div>
+      <div><strong>Choose your transport mode</strong><br>Select Walk or Bike in the Transport panel before clicking. Each mode uses different road rules and speeds. Car is temporarily unavailable.</div>
     </div>
     <div class="help-item">
       <span class="help-icon">🔀</span>
@@ -57,10 +57,17 @@
     <div class="mode-row">
       <button class="mode-btn active" data-mode="walk">🚶 Walk</button>
       <button class="mode-btn" data-mode="bike">🚲 Bike</button>
-      <!-- disabled: modo car sin cobertura real hoy (ver docs/decisions.md,
-           Fase 8A(1), 2026-08-14) -- title/nota puestos por JS desde
-           UI_COPY para no duplicar el texto en dos sitios. -->
-      <button class="mode-btn" data-mode="car" id="btn-mode-car" disabled>🚗 Car</button>
+      <!-- aria-disabled (no el atributo nativo `disabled`) + tabindex="-1":
+           modo car sin cobertura real hoy (ver docs/decisions.md,
+           Fase 8A(1), 2026-08-14, incluida la corrección de accesibilidad
+           de la propia revisión de código de este ítem). `disabled` nativo
+           sacaría el botón del árbol de accesibilidad en varias
+           combinaciones navegador/lector de pantalla; aria-disabled lo
+           mantiene anunciable como "no disponible" sin permitir activarlo
+           (el guard real está en el handler de click en app_original.js).
+           title/aria-label/nota puestos por JS desde UI_COPY para no
+           duplicar el texto en varios sitios. -->
+      <button class="mode-btn" data-mode="car" id="btn-mode-car" aria-disabled="true" tabindex="-1">🚗 Car</button>
     </div>
     <div id="car-disabled-note" class="mode-note"></div>
   </div>
@@ -71,6 +78,7 @@
     <div id="hint">Click on the map to find the nearest AED.</div>
     <div id="loading">Calculating route…</div>
     <div id="no-results" style="display:none"></div>
+    <div id="request-error" style="display:none"></div>
     <div id="results">
       <div id="result-best"></div>
       <button id="btn-compare">Compare routes</button>

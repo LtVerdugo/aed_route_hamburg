@@ -17,11 +17,21 @@ const state = {
 // showNoResults() ni el resto del archivo — ese es el propósito de
 // aislarlas en este objeto.
 const UI_COPY = {
-  // {mode} se sustituye por "walk"/"bike"/"car" en tiempo de ejecución.
+  // {mode} se sustituye por "walk"/"bike" en tiempo de ejecución (car está
+  // deshabilitado, así que este mensaje nunca se dispara para ese modo).
+  // NOTA para quien apruebe el texto (señalado en la revisión de código de
+  // este mismo ítem, 2026-08-14): con car deshabilitado, si falla walk,
+  // el mensaje sugiere "Try Walk" — el mismo modo que acaba de fallar.
+  // Revisar antes de aprobar definitivamente.
   noResults:
     "No AED could be reached from here by {mode}. Try Walk or Bike, " +
     "or call emergency services if this is urgent.",
   carDisabledNote: "Car routing temporarily unavailable",
+  // Distinto de noResults a propósito: esto es un fallo de la petición en
+  // sí (red caída, error del backend), no "no hay AED alcanzable" — no
+  // hacer una afirmación específica y potencialmente falsa sobre rutas
+  // cuando en realidad no se sabe si existe una.
+  requestError: "Something went wrong contacting the server. Please try again.",
 };
 
 const APP_BASE = (() => {
@@ -91,6 +101,13 @@ async function loadAEDs() {
 // ── Mode selector ──────────────────────────────────────────────
 document.querySelectorAll(".mode-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
+    // Corregido en la revisión de código de la Fase 8A(1): el botón Car
+    // usa aria-disabled (no el atributo nativo disabled) para que lectores
+    // de pantalla en modo de lectura lineal SÍ lo encuentren y anuncien
+    // como "no disponible" en vez de que desaparezca sin más — pero
+    // aria-disabled, a diferencia de disabled, NO bloquea el evento click
+    // por sí solo, así que hay que comprobarlo aquí explícitamente.
+    if (btn.getAttribute("aria-disabled") === "true") return;
     document.querySelectorAll(".mode-btn").forEach(
       (b) => b.classList.remove("active")
     );
@@ -100,14 +117,23 @@ document.querySelectorAll(".mode-btn").forEach((btn) => {
 });
 
 // Car deshabilitado (ver docs/decisions.md, Fase 8A(1)): sin cobertura
-// real hoy (ver Fase 4/decisions.md sobre el modo car). El botón ya
-// lleva el atributo `disabled` en el HTML — un botón disabled no
-// dispara "click", así que no hace falta tocar el handler de arriba.
-// Solo se pone aquí el texto (desde UI_COPY, no repetido a mano) como
-// tooltip y como nota visible permanente.
+// real hoy (ver Fase 4/decisions.md sobre el modo car). Se usa
+// aria-disabled + tabindex="-1" en vez del atributo nativo `disabled`
+// (corregido en la revisión de código de este ítem): un botón
+// nativamente disabled se saca por completo del árbol de accesibilidad en
+// varias combinaciones navegador/lector de pantalla, así que un usuario
+// navegando en modo de lectura lineal nunca se enteraría de que Car
+// existe ni de por qué falta. Con aria-disabled sigue apareciendo y
+// anunciándose como no disponible; tabindex="-1" lo saca de la navegación
+// por Tab (igual que un botón realmente disabled, consistente con que un
+// usuario de ratón tampoco puede activarlo). El guard de más arriba en el
+// handler de click es lo que de verdad impide activarlo.
 {
   const carBtn = document.getElementById("btn-mode-car");
-  if (carBtn) carBtn.title = UI_COPY.carDisabledNote;
+  if (carBtn) {
+    carBtn.title = UI_COPY.carDisabledNote;
+    carBtn.setAttribute("aria-label", `Car — ${UI_COPY.carDisabledNote}`);
+  }
   const carNote = document.getElementById("car-disabled-note");
   if (carNote) carNote.textContent = UI_COPY.carDisabledNote;
 }
@@ -138,19 +164,44 @@ map.on("click", async (e) => {
     pane: "originPane",
   }).addTo(map);
 
+  // Capturado en el momento del envío, no leído de nuevo cuando llegue la
+  // respuesta — corregido en la revisión de código de la Fase 8A(1): si
+  // el usuario cambia de modo mientras la petición está en vuelo,
+  // state.mode ya no describe la petición que realmente se hizo.
+  const requestMode = state.mode;
+
   try {
     const res = await fetch(apiUrl("route"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lat, lon: lng, mode: state.mode }),
+      body: JSON.stringify({ lat, lon: lng, mode: requestMode }),
     });
+
+    // Corregido en la revisión de código de la Fase 8A(1): antes no se
+    // comprobaba res.ok, así que un error real del backend (400 modo
+    // inválido, 500, etc.) se interpretaba igual que "sin resultados" —
+    // una afirmación específica y potencialmente falsa sobre rutas,
+    // cuando en realidad no se sabe si existe una.
+    if (!res.ok) {
+      console.error("Routing error: HTTP", res.status);
+      showRequestError();
+      return;
+    }
+
     const data = await res.json();
-    state.results = data.results || [];
+    if (!Array.isArray(data.results)) {
+      console.error("Routing error: unexpected response shape", data);
+      showRequestError();
+      return;
+    }
+
+    state.results = data.results;
+    state.lastRequestMode = requestMode;
     renderPanel();
     drawRoutes();
   } catch (err) {
     console.error("Routing error details:", err);
-    showHint();
+    showRequestError();
   }
 });
 
@@ -166,11 +217,9 @@ function renderPanel() {
   // nodo, y un origen fuera del componente gigante (Fase 7) — el backend
   // no distingue el motivo en la respuesta, así que el frontend tampoco
   // necesita hacerlo aquí.
-  if (!state.results.length) { showNoResults(); return; }
+  if (!state.results.length) { showNoResults(state.lastRequestMode); return; }
 
-  document.getElementById("hint").style.display = "none";
-  document.getElementById("loading").style.display = "none";
-  document.getElementById("no-results").style.display = "none";
+  hideAllPanels();
   document.getElementById("results").style.display = "block";
 
   const best = state.results[0];
@@ -367,31 +416,65 @@ function showAedPin(r) {
 }
 
 // ── UI helpers ─────────────────────────────────────────────────
-function showLoading() {
+// Los cinco paneles de la barra lateral (hint / loading / no-results /
+// request-error / results) son mutuamente excluyentes. Centralizado aquí
+// tras la revisión de código de la Fase 8A(1): antes cada función
+// show*() repetía su propia lista de "ocultar los demás", lo que ya
+// había hecho fácil olvidarse de uno al añadir un panel nuevo (exactamente
+// lo que pasó al añadir request-error) — con un único punto de reseteo,
+// añadir un sexto panel en el futuro no puede volver a producir ese
+// mismo error de omisión.
+function hideAllPanels() {
   document.getElementById("hint").style.display = "none";
+  document.getElementById("loading").style.display = "none";
   document.getElementById("no-results").style.display = "none";
+  document.getElementById("request-error").style.display = "none";
   document.getElementById("results").style.display = "none";
+}
+
+function showLoading() {
+  hideAllPanels();
   document.getElementById("loading").style.display = "block";
 }
 
-function showHint() {
-  document.getElementById("hint").style.display = "block";
-  document.getElementById("no-results").style.display = "none";
-  document.getElementById("results").style.display = "none";
-  document.getElementById("loading").style.display = "none";
-}
+// No hay una función showHint() propia: el estado "antes de cualquier
+// click" es simplemente el HTML de partida de #hint, visible por defecto
+// (sin display:none ni inline ni por CSS) hasta el primer click. Antes de
+// la revisión de código de la Fase 8A(1) sí existía una showHint(),
+// reutilizada también para errores de red y para "sin resultados" — al
+// separar esos dos casos en showRequestError()/showNoResults(), la
+// función dejó de tener ninguna llamada real y se retiró en vez de
+// dejarla como código muerto.
 
 // Fase 8A(1), 2026-08-14: distinta de showHint() a propósito -- esta se
 // usa SOLO cuando hubo un click y el backend respondió con results: []
 // (agua / fuera de MAX_SNAP_DISTANCE_M / fuera del componente gigante,
 // ver renderPanel()), no antes de cualquier click. Texto en UI_COPY,
 // borrador pendiente de aprobación del equipo.
-function showNoResults() {
+//
+// `mode` se recibe como parámetro (el modo con el que se hizo la petición
+// que de verdad falló, capturado en el map.on("click") — corregido en la
+// revisión de código de este ítem) en vez de leer state.mode aquí dentro,
+// que podría haber cambiado ya si el usuario cambió de modo mientras la
+// petición seguía en vuelo.
+function showNoResults(mode) {
+  hideAllPanels();
   const el = document.getElementById("no-results");
-  el.textContent = UI_COPY.noResults.replace("{mode}", state.mode);
-  document.getElementById("hint").style.display = "none";
-  document.getElementById("results").style.display = "none";
-  document.getElementById("loading").style.display = "none";
+  el.textContent = UI_COPY.noResults.replace("{mode}", mode);
+  el.style.display = "block";
+}
+
+// Fase 8A(1), 2026-08-14 (añadida en la revisión de código de este mismo
+// ítem): distinta tanto de showHint() como de showNoResults() a propósito
+// -- esto es un fallo de la petición en sí (red caída, error HTTP del
+// backend, forma de respuesta inesperada), no "no hay AED alcanzable
+// desde aquí". No reusar showNoResults() aquí: haría una afirmación
+// específica y potencialmente falsa sobre rutas cuando en realidad no se
+// sabe si existe una.
+function showRequestError() {
+  hideAllPanels();
+  const el = document.getElementById("request-error");
+  el.textContent = UI_COPY.requestError;
   el.style.display = "block";
 }
 

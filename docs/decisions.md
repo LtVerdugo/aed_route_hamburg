@@ -876,3 +876,72 @@ Verificado también que el camino de éxito no se rompió (mismo resultado
 exacto que antes, 165.8s en `dense_urban`) y que los 20 tests de backend
 siguen en verde (este cambio es puramente de frontend, no debería
 afectarlos, y no lo hizo).
+
+---
+
+## 2026-08-14 — Fase 8A(1): revisión de código — 5 hallazgos "Important" verificados y corregidos
+
+Revisor independiente arrancó el frontend real, reprodujo los tres casos
+legítimos de "sin resultados" y el camino de éxito contra el backend real
+(coincidiendo exactamente con lo ya verificado), corrió `node --check` y
+el suite de pytest — todo confirmado. Encontró además 5 problemas reales
+en la lógica del propio ítem, no solo de estilo, todos reverificados por
+mí antes de corregirlos:
+
+1. **Errores reales del backend se interpretaban como "sin AED
+   alcanzable" — CONFIRMADO y corregido.** `fetch` no lanza excepción por
+   un status HTTP de error; sin comprobar `res.ok`, un 400 (modo
+   inválido) o un 500 real caían en la misma rama que `results: []`,
+   haciendo una afirmación específica y potencialmente falsa. Reproducido
+   con `mode: "bogus"` → 400 real. **Corregido**: `res.ok` se comprueba
+   antes de leer `data.results`; cualquier fallo de red, HTTP o forma de
+   respuesta inesperada va a una función nueva, `showRequestError()`, con
+   su propio texto (`UI_COPY.requestError`), distinta tanto de "sin
+   resultados" como del hint inicial.
+2. **El `catch` de errores de red seguía usando `showHint()`** — el mismo
+   texto genérico de "haz click en el mapa" reaparecería justo después de
+   que el usuario ya hubiera hecho click, contradiciendo lo que acababa
+   de hacer. **Corregido**: usa `showRequestError()` también.
+3. **Carrera de `state.mode` — CONFIRMADO y corregido.** Si el usuario
+   cambia de modo mientras una petición sigue en vuelo, `showNoResults()`
+   leía `state.mode` en el momento de la respuesta, no el modo con el que
+   realmente se hizo la petición que falló — pudiendo mostrar "no se
+   pudo por bike" para una petición que en realidad se hizo por walk.
+   **Corregido**: el modo se captura en una constante local al enviar la
+   petición y se pasa explícitamente a `showNoResults(mode)`.
+4. **Accesibilidad: `disabled` nativo saca el botón Car del árbol de
+   accesibilidad — CONFIRMADO, corregido.** Un lector de pantalla en modo
+   de lectura lineal nunca se encontraría con el botón ni sabría por qué
+   falta. **Corregido**: `aria-disabled="true"` + `tabindex="-1"` en vez
+   de `disabled`; como `aria-disabled` no bloquea `click` por sí solo, se
+   añadió el guard explícito correspondiente en el handler existente.
+   `aria-label` añadido con el motivo.
+5. **El modal de ayuda seguía diciendo "Select Walk, Bike or Car... each
+   mode uses different road rules"** — contradicción inmediata con el
+   botón recién deshabilitado. **Corregido**: texto actualizado para
+   mencionar que Car no está disponible temporalmente.
+
+**Hallazgo sobre el propio texto en borrador, NO corregido en el código a
+propósito** (es una cuestión de redacción, no de lógica, y el usuario
+pidió usar el texto ya acordado sin reescribirlo): con Car deshabilitado,
+si falla walk, el mensaje dice "Try Walk or Bike" — sugiriendo repetir el
+modo que acaba de fallar. Señalado explícitamente aquí para que el equipo
+lo tenga en cuenta al aprobar el texto definitivo; no se ha tocado
+`UI_COPY.noResults`.
+
+**Refactor de paso, motivado directamente por el hallazgo 1**: las cinco
+funciones que muestran/ocultan los paneles de la barra lateral
+(`hint`/`loading`/`no-results`/`request-error`/`results`) ahora comparten
+un único `hideAllPanels()` en vez de repetir la lista de "ocultar los
+demás" en cada una — el propio hallazgo 1 mostró en la práctica lo fácil
+que es olvidar un panel al añadir uno nuevo. `showHint()` quedó sin
+ninguna llamada real tras separar sus dos usos anteriores en funciones
+distintas — se retiró en vez de dejarla como código muerto nuevo.
+
+Verificado tras las correcciones: 20/20 tests de backend en verde (sin
+cambios, es un cambio de frontend), `node --check` sin errores, y en
+vivo: un modo inválido real devuelve 400 y ya no se confunde con "sin
+resultados"; los tres casos legítimos de agua/fuera de
+`MAX_SNAP_DISTANCE_M`/fuera del componente gigante siguen devolviendo
+`results: []` sin cambios; el HTML servido incluye `aria-disabled`,
+`tabindex="-1"` y el nuevo `#request-error`.
