@@ -87,17 +87,33 @@ def test_current_heuristic_is_not_admissible_for_degree1_destination():
         )
 
 
-def test_degree2_destination_can_silently_return_suboptimal_path():
+def test_degree2_destination_CURRENTLY_returns_suboptimal_path_BUG_DOCUMENTED():
     """
-    NO se espera que falle — es una demostración concreta y reproducible
-    (no un caso hipotético) de que, si un nodo destino tuviera grado de
-    entrada 2 en vez del grado 1 real de los AEDs de hoy, la heurística
-    actual haría que `nx.astar_path` devuelva una ruta SUBÓPTIMA sin ningún
-    error ni aviso. Sirve de guardarraíl de regresión: si en el futuro se
-    conecta un AED a más de un nodo de acceso (p. ej. si la opción (iv) del
-    modo car — ver docs/decisions.md — se implementara sin corregir primero
-    esta heurística), este es exactamente el escenario que rompería la
-    garantía de optimalidad en silencio.
+    ⚠️ ESTE TEST PASA HOY PORQUE DOCUMENTA UN BUG, NO PORQUE EL COMPORTAMIENTO
+    SEA CORRECTO. No leerlo al revés.
+
+    Demuestra, de forma concreta y reproducible (no un caso hipotético), que
+    si un nodo destino tuviera grado de entrada 2 en vez del grado 1 real de
+    los AEDs de hoy, la heurística actual haría que `nx.astar_path` devuelva
+    una ruta SUBÓPTIMA (coste 1050) en vez del óptimo real (coste 1010), sin
+    ningún error ni aviso.
+
+    **Cuando la Fase 6 corrija la heurística, este mismo escenario debería
+    empezar a devolver 1010 (el óptimo) — y por tanto este test DEBE EMPEZAR
+    A FALLAR.** Esa es la señal correcta de que el fix funciona: una MEJORA,
+    no una regresión.
+
+    Si esto pasa: NO "arregles" el test bajando la expectativa para que
+    siga aceptando 1050 — eso congelaría el bug. En su lugar, actualiza la
+    aserción para exigir el óptimo (1010) y deja en el docstring constancia
+    de que antes de la Fase 6 devolvía 1050. Ver docs/decisions.md, entrada
+    de la Fase 6, para el registro de este cambio de comportamiento.
+
+    Sirve además de guardarraíl de regresión permanente: si en el futuro se
+    conecta un AED a más de un nodo de acceso (p. ej. la opción (iv) del
+    modo car — ver docs/decisions.md), este es exactamente el escenario que
+    podría romper la garantía de optimalidad en silencio si la heurística
+    volviera a quedar mal calibrada.
     """
     G = nx.DiGraph()
     G.add_node("origin", x=500.0, y=500.0)
