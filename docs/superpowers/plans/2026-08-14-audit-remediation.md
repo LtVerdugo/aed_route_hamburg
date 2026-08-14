@@ -357,7 +357,7 @@ cada tarea:
 **Interfaces:**
 - Consumes: `find_nearest_aeds` (firma sin cambios, `src/aed_route/routing.py`)
 
-- [ ] **Paso 1:** Envolver la llamada síncrona en `asyncio.to_thread`:
+- [x] **Paso 1:** Envolver la llamada síncrona en `asyncio.to_thread`:
 
   ```python
   import asyncio
@@ -374,16 +374,15 @@ cada tarea:
   )
   ```
 
-- [ ] **Paso 2:** Smoke test manual — confirmar que un click en el mapa
+- [x] **Paso 2:** Smoke test manual — confirmar que un click en el mapa
       sigue devolviendo ruta en los tres modos (no hay suite automatizada
       todavía; el arnés llega en la Fase 5. Se deja constancia explícita de
       esta desviación de TDD estricto en el mensaje de cierre de fase).
-- [ ] **Paso 3:** Commit.
-
-  ```bash
-  git add app/app.py
-  git commit -m "fix: no bloquear el event loop en POST /api/route (C10)"
-  ```
+      **Reforzado en la Fase 3(b)**: comparación byte a byte de la
+      respuesta completa de `/api/route` pre/post cambio en los 3 modos —
+      idéntica en los tres casos.
+- [x] **Paso 3:** Commit. `ecc1130` — "fase 3a: no bloquear el event loop en
+      POST /api/route".
 
 #### 3(b): Puerto canónico
 
@@ -395,17 +394,19 @@ cada tarea:
 - Modify: `docs/apache.conf:7-12`
 - Modify: `README_deploy.md` (todas las referencias a puerto)
 
-- [ ] **Paso 1:** Confirmar con el usuario, al abrir esta fase, el puerto
+- [x] **Paso 1:** Confirmar con el usuario, al abrir esta fase, el puerto
       canónico (propuesta de la auditoría: 5000, por ser el que ya usan
       Dockerfile/compose/apache.conf) — no asumir sin OK explícito.
-- [ ] **Paso 2:** Aplicar el valor acordado en los 6 archivos listados.
-- [ ] **Paso 3:** Actualizar la nota dejada pendiente en Fase 2 Paso 2 sobre
-      puertos (si aplica).
-- [ ] **Paso 4:** Commit.
-
-  ```bash
-  git commit -m "chore: unificar puerto canónico en app/despliegue (C7)"
-  ```
+      **Confirmado: 5000.**
+- [x] **Paso 2:** Aplicar el valor acordado (`app/app.py`, `README_deploy.md`,
+      `docs/routing_methodology.md`, `docs/network_and_graph_build.md` —
+      los otros 4 artefactos ya usaban 5000, sin cambios necesarios).
+- [x] **Paso 3:** Nota pendiente de Fase 2 actualizada en los tres
+      documentos afectados.
+- [x] **Paso 4:** Commit. `3afde65` — "fase 3b: unificar el puerto canonico
+      a 5000". Riesgo explícito registrado en `docs/decisions.md`: elegido
+      por consistencia interna del repo, NO verificado contra el proxy real
+      de producción.
 
 #### 3(c): Limpieza de dependencias y archivo huérfano
 
@@ -413,16 +414,15 @@ cada tarea:
 - Modify: `requirements.txt`
 - Delete: `static/data/demo_rathaus_response.json`
 
-- [ ] **Paso 1:** Confirmar con el usuario cuáles de `python-multipart` /
-      `pyarrow` retirar (la auditoría no encontró uso directo, pero no
-      descarta uso indirecto no detectado por grep de texto).
-- [ ] **Paso 2:** Retirar `static/data/demo_rathaus_response.json` (huérfano,
-      sin referencias en JS/HTML).
-- [ ] **Paso 3:** Commit.
-
-  ```bash
-  git commit -m "chore: retirar dependencias sin uso confirmado y archivo huérfano (C15, C17)"
-  ```
+- [x] **Paso 1:** Reconfirmado por grep (sin pausa adicional al usuario —
+      la aprobación general de Fase 3 cubrió esto): `python-multipart` y
+      `pyarrow` sin uso directo, ambos retirados. `geopandas` se mantiene
+      (dependencia transitiva real de osmnx).
+- [x] **Paso 2:** Retirado `static/data/demo_rathaus_response.json`.
+- [x] **Paso 3:** Commit. `6f4c8fa` — "fase 3c: retirar dependencias sin uso
+      confirmado y archivo huerfano". Limitación anotada: el venv no se
+      recreó desde cero, no prueba una instalación limpia sin esas
+      dependencias.
 
 Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
 `verification-before-completion` + smoke test, no solo al final de 3(c).
