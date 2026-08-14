@@ -642,3 +642,26 @@ benigna en el warm-up de caché; cifras empíricas embebidas en docstrings
 que podrían quedar desactualizadas si el grafo se reconstruyera; asimetría
 de manejo de errores entre el `ValueError` de car y el resto de
 `find_nearest_aeds`).
+
+---
+
+## 2026-08-14 — Dos anotaciones del usuario tras aprobar la Fase 6, antes de abrir la Fase 7
+
+**(1) `_ADMISSIBILITY_SAFETY_MARGIN = 0.99` es una calibración específica
+de Hamburgo/EPSG:25832, no un valor universal.** El 0,298% máximo medido
+depende de cuán lejos está el área cubierta del meridiano central de la
+zona UTM (32N, 9°E) — otra ciudad, otra zona UTM u otro CRS proyectado
+tendría una distorsión distinta y este margen no se puede reutilizar sin
+volver a medir. Añadido un comentario explícito junto a la constante en
+`routing.py` con esta advertencia y el procedimiento a repetir (medir
+distancia proyectada recta vs. `length_m` geodésico sobre una muestra
+representativa de la nueva zona).
+
+**(2) Conectar `scripts/generate_golden_routes.py` a un test de pytest
+real (sugerencia del revisor de la Fase 6): pospuesta explícitamente a
+DESPUÉS de la Fase 8**, no antes. Motivo: cambiar la infraestructura del
+arnés de regresión justo antes de la fase (7) que más depende de él para
+detectar diffs correctos es mala idea — se quiere el arnés estable
+mientras se usa como oráculo, no en construcción. Queda como mejora
+recomendada, con orden explícito de secuenciación (post-Fase 8), no como
+deuda con plazo.

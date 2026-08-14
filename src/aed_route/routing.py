@@ -65,6 +65,18 @@ _MAX_SPEED_M_S: dict[str, float] = {
 # violando admisibilidad estricta. Con este factor (1% de margen, más de 3
 # veces el peor caso medido), h(n) queda garantizada por debajo del coste
 # real incluso con esa distorsión.
+#
+# Esta calibración (0.99, el 1%) es ESPECÍFICA de Hamburgo en EPSG:25832
+# (UTM zona 32N) — la magnitud de la distorsión de escala depende de cuán
+# lejos esté el área cubierta del meridiano central de la proyección (9°E
+# para esta zona) y de la zona/proyección UTM en sí. Si este código se
+# reutiliza para otra ciudad, otra zona UTM o cualquier otro CRS
+# proyectado, este margen NO se puede asumir válido sin repetir la
+# medición (ver docs/decisions.md, Fase 7, para el procedimiento usado
+# aquí): medir la distancia proyectada recta frente al `length_m`
+# geodésico real sobre una muestra representativa de aristas de la nueva
+# zona, y fijar el margen a partir del máximo medido allí, no de este
+# valor.
 _ADMISSIBILITY_SAFETY_MARGIN = 0.99
 
 # Cachés a nivel de módulo, keyed por id(G)/id(nodes_df). El grafo se carga
