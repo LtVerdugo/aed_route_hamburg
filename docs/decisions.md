@@ -259,3 +259,27 @@ proyecto siga instalando y arrancando correctamente con un `pip install -r
 requirements.txt` limpio y sin ellos — solo prueba que el código sigue
 funcionando con el venv ya existente. No se ha creado un venv nuevo para
 verificar esto de forma más rigurosa en esta pasada.
+
+---
+
+## 2026-08-14 — Fase 3(b): puerto canónico unificado a 5000 — cierra: C7 (con riesgo de despliegue pendiente de verificar, ver más abajo)
+
+Unificado a **5000** en `app/app.py` (era 5050 en su bloque `__main__`),
+`README_deploy.md`, `docs/routing_methodology.md` y
+`docs/network_and_graph_build.md`. `app/wsgi.py`, `Dockerfile`,
+`docker-compose.yml` y `docs/apache.conf` ya usaban 5000, sin cambios.
+
+**El valor se eligió por consistencia entre los artefactos de este
+repositorio (4 de 5 ya usaban 5000; el 5050 vivía en un bloque `__main__`
+que ningún camino de arranque documentado ejecuta) — NO se ha verificado
+contra la configuración real del proxy inverso desplegado en el servidor
+de HCU.** `docs/apache.conf` es un snippet guardado en este repo, no una
+prueba de lo que está efectivamente configurado en producción hoy.
+
+**Riesgo explícito, sin mitigar todavía:** si el Apache real de producción
+apunta a 5050 (el valor que `app/app.py` usaba hasta este commit), este
+cambio dejaría el servicio inaccesible en el próximo despliegue hasta que
+alguien actualice esa configuración de Apache para que coincida. Verificar
+la configuración real del proxy inverso ANTES del próximo despliegue queda
+como acción pendiente explícita — no se puede cerrar como "hecho" solo con
+este commit.

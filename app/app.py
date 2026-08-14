@@ -184,4 +184,7 @@ async def route(body: RouteRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5050)
+    # Canonical port, unified 2026-08-14 (was 5050) to match every other
+    # deployment artifact in this repo (Dockerfile, docker-compose.yml,
+    # docs/apache.conf, app/wsgi.py) — see docs/decisions.md.
+    uvicorn.run(app, host="0.0.0.0", port=5000)

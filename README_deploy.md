@@ -91,13 +91,18 @@ not Gunicorn — there is no Gunicorn config anywhere in this repo):
 
 uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
 
-**Port note:** the port used across this repo's files is currently
-inconsistent — `app/app.py`'s own `__main__` block defaults to 5050, while
-`app/wsgi.py`, `Dockerfile`, `docker-compose.yml` and `docs/apache.conf` use
-5000. This is a known, tracked inconsistency (see `docs/decisions.md`),
-pending unification in a later remediation phase. Use whatever port you
-pass explicitly to `uvicorn --port`, and make sure it matches your reverse
-proxy configuration — do not assume 5000 or 5050 without checking both ends.
+**Port note (resolved 2026-08-14):** the canonical port across this repo is
+now **5000** — unified in `app/app.py`, `app/wsgi.py`, `Dockerfile`,
+`docker-compose.yml` and `docs/apache.conf` (this document previously
+described an inconsistency between 5000 and 5050; that inconsistency is
+now fixed in the code and docs). **This choice was made for internal
+consistency between this repo's own files — it has NOT been verified
+against the actual reverse proxy configuration running on the HCU server.**
+`docs/apache.conf` is a snippet kept in this repo, not proof of what is
+actually configured in production. If the real deployed proxy points to
+5050, this change will make the service unreachable until that proxy
+config is updated to match. Verify the live proxy configuration before the
+next deployment — see `docs/decisions.md`.
 
 Important notes:
 - --workers must be 1. The graph bundle (364 MB) is loaded into memory once at startup and is not safe to share across multiple worker processes.
@@ -126,7 +131,7 @@ environment variable is needed:
 
 ```nginx
 location /demos/aed-routing/ {
-    proxy_pass http://127.0.0.1:5050/;
+    proxy_pass http://127.0.0.1:5000/;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -148,7 +153,7 @@ Example nginx config for that mode:
 
 ```nginx
 location /demos/aed-routing/ {
-    proxy_pass http://127.0.0.1:5050;
+    proxy_pass http://127.0.0.1:5000;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -160,7 +165,7 @@ Once the server is ready you will see this log line:
   FastAPI app ready.
 
 The app is then accessible at:
-  http://<server-ip>:5050
+  http://<server-ip>:5000
 
 or, behind the CML reverse proxy:
   https://www.cml.hcu-hamburg.de/demos/aed-routing/

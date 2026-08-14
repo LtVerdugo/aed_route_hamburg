@@ -212,8 +212,10 @@ and validated:
   previously said "Flask"; the code has always been FastAPI, see
   `app/app.py`)
 
-The application is served via **uvicorn** (not a Flask development server).
-The port used across this repo's own files is currently inconsistent
-(5000 in most deployment files, 5050 in `app/app.py`'s own `__main__`
-block) — see `docs/decisions.md`, pending unification. The graph bundle is
-loaded once at startup and reused for all routing queries.
+The application is served via **uvicorn** (not a Flask development server)
+on **port 5000** — unified across every deployment artifact in this repo
+2026-08-14 (this line previously described an inconsistency between 5000
+and 5050; now fixed). That choice was made for internal consistency
+between this repo's own files, not verified against the actual reverse
+proxy configuration in production — see `docs/decisions.md`. The graph
+bundle is loaded once at startup and reused for all routing queries.

@@ -5,11 +5,11 @@ Ejecutar tras CADA fase del plan de remediación
 fase por cerrada (`superpowers:verification-before-completion`). Si
 cualquier paso falla: revertir el commit de la fase en curso y parar.
 
-**Nota (Fase 0):** el puerto de arranque aún no está unificado (hallazgo
-C7 — pendiente de decidirse en la Fase 3b). Hoy conviven 5050 (bloque
-`__main__` de `app/app.py`) y 5000 (`app/wsgi.py`, `Dockerfile`,
-`docker-compose.yml`, `docs/apache.conf`). Usar el puerto real que el
-comando de arranque elegido efectivamente expone, no uno fijo de memoria.
+**Nota (actualizada en Fase 3b, 2026-08-14):** el puerto está unificado a
+**5000** en todo el repositorio (hallazgo C7, cerrado). Esta unificación se
+hizo por consistencia interna entre los archivos del propio repo — NO se
+ha verificado contra la configuración real del proxy inverso desplegado en
+producción; ver `docs/decisions.md`.
 
 1. **Arrancar el servidor:**
    ```bash
@@ -56,6 +56,7 @@ como `docs/decisions.md`):
 
 | Fecha | Fase | Resultado | Notas |
 |---|---|---|---|
+| 2026-08-14 | Fase 3(b) | OK | Puerto unificado a 5000. Arranque OK en :5000, `/healthz` 200, `POST /api/route` en los tres modos responde igual que antes. **Verificación reforzada de 3(a)** (pedida explícitamente): se comparó la respuesta COMPLETA de `/api/route` (no solo el status ni un campo) entre el código pre-3a (recuperado de `git show c143e05:app/app.py`, intercambiado temporalmente en el árbol de trabajo y restaurado después) y el código actual (3a+3b) — walk, bike y car: **idénticas byte a byte** en los tres casos (`diff -q` sin diferencias, mismo tamaño en bytes). Confirma que envolver la llamada en `asyncio.to_thread` no alteró ningún resultado, solo la concurrencia. Apagado limpio en ambas ejecuciones, sin procesos huérfanos. |
 | 2026-08-14 | Fase 3(c) | OK (con limitación anotada) | Arranque OK, `/healthz` 200, `GET /` 200, `/api/aeds` 200. Apagado limpio. Limitación: el `.venv` no se recreó desde cero tras retirar `python-multipart`/`pyarrow` de `requirements.txt`, así que esto no prueba una instalación limpia sin esas dependencias — ver `docs/decisions.md`. |
 | 2026-08-14 | Fase 3(a) | OK | Arranque OK (~5 s), `/healthz` 200. `POST /api/route` en los tres modos: walk → 3 resultados (165.8 s), bike → 3 resultados (65.7 s), car → 0 resultados (ya conocido, sin cambio respecto al baseline). Comportamiento idéntico al de antes de envolver la llamada en `asyncio.to_thread` — el cambio no altera resultados, solo concurrencia. Apagado limpio, sin procesos huérfanos. |
 | 2026-08-14 | Fase 0 | Parcial — ver notas | Arranque OK (`.venv/bin/uvicorn app.app:app --host 127.0.0.1 --port 5000`, ~5 s hasta "FastAPI app ready."). `/healthz` → `{"ok":true}`. `GET /` → 200. `/api/aeds` → 141 features. `/api/boundary` → 200. `/api/isochrones` → 200. `POST /api/route` (origen aprox. Rathaus, 53.5503/9.9927): walk → 3 resultados (mejor 165.8 s), bike → 3 resultados (mejor 65.7 s), car → **0 resultados** (sin interpretar el motivo aquí — puede ser zona peatonal sin acceso rodado cercano; queda para análisis fuera de esta fase, no es un fallo de arranque). Pasos 3 y 4 del checklist (carga visual de las 3 capas en navegador, click real en el mapa) **NO se ejecutaron literalmente** — no hay navegador disponible en este entorno; se verificó el equivalente de backend (endpoints responden con datos válidos) pero no la renderización real del frontend. Este punto es precisamente el que la Fase 1 (hallazgo C1) va a investigar a fondo. Apagado limpio confirmado (sin procesos huérfanos tras `kill`). |

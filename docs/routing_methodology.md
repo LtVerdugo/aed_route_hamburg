@@ -591,15 +591,16 @@ remove) is a pending product decision, not yet made.
 - Nearest AED: green circle marker at AED position
 
 **Startup command:**
-.venv/bin/uvicorn app.app:app --host 0.0.0.0 --port <port>
+.venv/bin/uvicorn app.app:app --host 0.0.0.0 --port 5000
 
 (Corrected 2026-08-14 — there is no `app/flask_app.py` in this repo; the
 entry point is `app/app.py`, run via uvicorn, not a direct `python
-app/flask_app.py` invocation. The exact `<port>` value is currently
-inconsistent across this repo's own files — see `docs/decisions.md` — and
-is pending unification in a later remediation phase. Do not assume 5050 or
-5000 without checking `app/app.py`'s current default and your reverse
-proxy configuration.)
+app/flask_app.py` invocation. Port unified to **5000** across every
+deployment artifact in this repo on this same date — this document
+previously described an inconsistency between 5000 and 5050, now fixed.
+This choice was made for internal consistency between this repo's own
+files; it has NOT been verified against the actual reverse proxy
+configuration running in production — see `docs/decisions.md`.)
 
 ---
 
