@@ -595,9 +595,47 @@ Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
 
 ---
 
+### Fase 8: Modo car (8B, bloqueada) + limpieza de frontend/docs (8A, no bloqueada)
+
+Añadida durante la ejecución (no estaba en el plan original con este
+detalle) — decisiones registradas en `docs/decisions.md`, Fase 4 y
+posteriores. Se ejecuta en items independientes, un commit cada uno, sin
+encadenar — el usuario pidió parar al terminar cada item, no seguir con
+el siguiente en la misma respuesta.
+
+**Fase 8A — no depende de nadie:**
+- [x] **8A(1):** Mitigación del fallo silencioso (mensaje explícito en
+      resultados vacíos + botón Car deshabilitado). Texto en `UI_COPY`,
+      marcado como borrador pendiente de aprobación del equipo.
+      `requesting-code-review` obligatoria ejecutada — 5 hallazgos
+      Important corregidos (ver `docs/decisions.md`).
+- [ ] **8A(2):** `SHORTLIST_EUCLIDEAN_K` = 5 en `config.py` + corrección de
+      "hasta 4 alternativas" en la doc. Golden files SÍ cambiarán —
+      mostrar diff caso por caso antes de commitear, confirmar
+      explícitamente si cambia algún rank 1 (no solo alternativas).
+      `requesting-code-review` obligatoria (toca comportamiento).
+- [ ] **8A(3):** Retirar `static/index.html`, `app.js`, `styles.css` y los
+      3 `hamburg_mitte_*.geojson`. Grep en todo el árbol (incluido
+      `scratch/`) antes de borrar, confirmando que nada más los
+      referencia. No requiere code review (solo borrado).
+- [ ] **8A(4):** Reemplazar `README.md` por un aviso corto que remita a
+      `README_deploy.md`. No requiere code review.
+- [ ] **8A(5):** Corregir `README_deploy.md`: documentar el escenario
+      `PUBLIC_BASE_PATH` como NO soportado (404 antes de servir el HTML,
+      ya diagnosticado en Fase 4); eliminar o corregir los dos bloques
+      nginx duplicados con contenido idéntico. No requiere code review.
+
+**Fase 8B — bloqueada, a la espera del equipo del usuario:**
+- [ ] Modo car: implementar la opción (iv) (snap dependiente del modo,
+      cKDTree restringido al componente gigante car) u otra que decida el
+      equipo, a partir del análisis y la medición ya entregados
+      (97,8% de cobertura de snap — ver `docs/decisions.md`, Fase 4).
+
 ## Cierre del plan (fuera de las 8 fases)
 
-Al terminar la Fase 7: consultar al usuario antes de invocar
-`superpowers:finishing-a-development-branch` para decidir cómo integrar
-`remediation/audit-2026-08` (merge a `main`, mantener aparte, etc.). No
-asumir la respuesta.
+Al terminar toda la Fase 8 (8A y 8B): consultar al usuario antes de
+invocar `superpowers:finishing-a-development-branch` para decidir cómo
+integrar `remediation/audit-2026-08` (merge a `main`, mantener aparte,
+etc.). No asumir la respuesta. (Corrección registrada explícitamente por
+el usuario, 2026-08-14: las fases cerradas hasta ahora son 0-7, no 0-8 —
+no invocar esa skill todavía.)
