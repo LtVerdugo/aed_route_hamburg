@@ -408,3 +408,19 @@ de proxy configurado SÍ elimina el prefijo público antes de reenviar (no
 el modo "PUBLIC_BASE_PATH"). Si cualquiera de las dos no se cumple, la
 aplicación no arrancará o no será accesible tras este trabajo de
 remediación.
+
+---
+
+## 2026-08-14 — Matiz sobre el 97,8% de cobertura del modo car (opción iv) — precisión de interpretación, no cambia el dato
+
+El 97,8% (136/139 AEDs con un nodo drivable alcanzable a ≤100 m, dentro
+del componente gigante car) es una **métrica de cobertura de snap**: mide
+si existe un punto de entrada a la red drivable cerca de cada AED. **No es
+una garantía de que A* encuentre ruta desde un origen arbitrario** — un
+origen concreto podría estar, a su vez, fuera del componente gigante
+drivable, o más allá de `MAX_SNAP_DISTANCE_M` de cualquier nodo drivable,
+independientemente de que el AED de destino tenga buena cobertura. Es la
+métrica correcta para decidir si la opción (iv) merece implementarse, pero
+no debe leerse ni comunicarse como "97,8% de consultas con éxito" — son
+dos cosas distintas. Anotado explícitamente para que no se malinterprete
+al llevarlo a discusión de equipo.
