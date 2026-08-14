@@ -158,3 +158,65 @@ añadió como pregunta abierta de metodología en
 (acceso privado en contexto de emergencia, umbrales de isócrona sin validar
 con literatura clínica), pendiente de confirmación explícita del equipo
 sobre si es una decisión deliberada.
+
+---
+
+## 2026-08-14 — Corrección al análisis del modo `car`: agujero compartido por (i)/(ii), cuarta opción (iv), medición que abre la Fase 4, y verificación de PUBLIC_BASE_PATH diferida — cierra: N/A (ampliación del análisis del hallazgo nuevo del modo car; no se implementa nada aquí)
+
+**Agujero compartido por (i) y (ii), no visto en el análisis original:** el
+nodo de snap de cada AED se eligió sobre TODOS los nodos de carretera, sin
+filtro de modo — `add_aed_nodes_to_graph` construye el `cKDTree` sobre
+`nodes_df[road_mask]` completo, sin distinguir `can_drive`. Como
+`can_drive` cubre solo el 43,9% de las aristas del grafo unificado, el
+`nearest_node` de un AED puede no tener ninguna arista drivable. Si eso
+ocurre:
+- **(i)** (hacer drivable la arista de acceso) no arregla nada: el
+  `nearest_node` sigue siendo inalcanzable en el subgrafo de coche; la
+  arista de acceso ahora drivable no sirve si no se puede llegar hasta el
+  otro extremo.
+- **(ii)** (enrutar al nodo de carretera más cercano al AED) falla igual:
+  el objetivo pasaría a ser exactamente ese mismo nodo inalcanzable.
+
+Ninguna de las dos opciones originales ataca esta causa; ambas asumían
+implícitamente que el `nearest_node` ya está en el componente drivable.
+
+**Opción (iv) — snap dependiente del modo (nueva, al mismo nivel de detalle
+que las otras tres):**
+Para el modo `car` específicamente, mapear cada AED al nodo de carretera
+más cercano **que tenga aristas `can_drive`**, usando un `cKDTree`
+construido en memoria al arranque solo sobre el subconjunto de nodos con
+al menos una arista drivable — no sobre todos los nodos de carretera como
+hace hoy `add_aed_nodes_to_graph`. Ataca la causa real (snap sin filtro de
+modo), no el síntoma. No requiere rebuild del grafo ni tocar
+`graph_builder_osm.py` — es un índice espacial adicional en memoria al
+arranque, igual que `build_node_index`/`build_aed_index` ya existentes,
+pero restringido a nodos drivables. Coste: la distancia de acceso en coche
+para cada AED superará previsiblemente los ~17 m medios actuales
+(calculados sin ese filtro), y hay que decidir cómo se refleja ese tramo
+adicional en `total_cost_s` y en lo que se dibuja en el mapa.
+
+**Medición que abre la Fase 4 (solo lectura, NO ejecutada ahora):** de los
+139 nodos AED del grafo, ¿cuántos tienen su `nearest_node` (el mismo que ya
+usa `add_aed_nodes_to_graph`) alcanzable en el subgrafo `can_drive=True`?
+Si son pocos, (i) es viable con excepción documentada caso por caso; si son
+muchos, solo (iv) o (iii) tienen sentido real. Este conteo será el primer
+paso de la Fase 4, antes de decidir entre las cuatro opciones.
+
+**Nueva pregunta abierta condicional:** si se elige (i), la velocidad
+asumida para la arista de acceso en coche sería una constante nueva sin
+respaldo bibliográfico (no es velocidad de conducción normal, es una
+maniobra de acceso/aparcamiento) — va a la lista de preguntas abiertas de
+`docs/routing_methodology.md` si y cuando se elija esa opción; no se
+inventa un valor ahora.
+
+**`PUBLIC_BASE_PATH` — verificación diferida a la Fase 4 (solo lectura):**
+que esta variable no exista en el código (confirmado en la Fase 2) implica
+que el escenario de proxy que NO elimina el prefijo público podría no estar
+soportado por el backend. Pendiente de verificar en la Fase 4, sin tocar
+código: (1) si `static/app_original.js` tolera ese escenario por su cuenta,
+vía el cálculo de `APP_BASE` desde `window.location.pathname`; (2) si los
+endpoints `/api/*` responderían correctamente bajo ese prefijo tal como
+está montado hoy en `app/app.py`. Según el resultado, `README_deploy.md`
+tendrá que documentar ese escenario como inviable, o como uno que funciona
+hoy por un efecto colateral del frontend y no por diseño explícito del
+backend — ninguna de las dos cosas está determinada todavía.
