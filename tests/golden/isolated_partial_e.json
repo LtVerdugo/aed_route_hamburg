@@ -1,0 +1,243 @@
+{
+  "case_id": "isolated_partial_e",
+  "description": "Componente aislada E (81 nodos; YA tiene 1 resultado parcial en walk hoy)",
+  "expectation_fase7": {
+    "outcome": "expected_improvement",
+    "reason": "Caso distinto de los anteriores: hoy YA devuelve 1 resultado en walk (por conectividad interna de su propia componente aislada con al menos un AED), pero 0 en bike/car. Nodo del componente gigante real a solo 14.2 m. Tras la Fase 7 se espera que MEJORE la calidad/cantidad de candidatos evaluados en walk (no solo que deje de estar vacío, que ya no lo está), y posiblemente que bike pase a tener resultado. El golden guarda la respuesta COMPLETA (no solo el conteo) precisamente para que la Fase 7 pueda comparar si de verdad mejora la ruta devuelta, no solo si el conteo sube."
+  },
+  "origin": {
+    "lat": 53.543155,
+    "lon": 10.001129
+  },
+  "results": {
+    "bike": {
+      "results": []
+    },
+    "car": {
+      "results": []
+    },
+    "walk": {
+      "results": [
+        {
+          "aed_access": "permissive",
+          "aed_id": 5880920245,
+          "aed_lat": 53.5425993,
+          "aed_lon": 10.0015647,
+          "aed_name": null,
+          "aed_opening_hours": "Mo-Fr 05:30-20:30",
+          "edges": [
+            {
+              "coords": [
+                [
+                  10.0011288,
+                  53.5431553
+                ],
+                [
+                  10.0011555,
+                  53.5431193
+                ]
+              ],
+              "cost_s": 2.5732530671048037,
+              "highway": "pedestrian",
+              "length_m": 4.374530214078166,
+              "name": null,
+              "time_s": 2.5732530671048037
+            },
+            {
+              "coords": [
+                [
+                  10.0011555,
+                  53.5431193
+                ],
+                [
+                  10.0011654,
+                  53.5431057
+                ]
+              ],
+              "cost_s": 0.9692147527286338,
+              "highway": "pedestrian",
+              "length_m": 1.6476650796386774,
+              "name": null,
+              "time_s": 0.9692147527286338
+            },
+            {
+              "coords": [
+                [
+                  10.0011654,
+                  53.5431057
+                ],
+                [
+                  10.0011994,
+                  53.5430601
+                ]
+              ],
+              "cost_s": 3.262282258718114,
+              "highway": "pedestrian",
+              "length_m": 5.545879839820794,
+              "name": null,
+              "time_s": 3.262282258718114
+            },
+            {
+              "coords": [
+                [
+                  10.0011994,
+                  53.5430601
+                ],
+                [
+                  10.0011804,
+                  53.5430551
+                ]
+              ],
+              "cost_s": 0.8076539998095489,
+              "highway": "pedestrian",
+              "length_m": 1.373011799676233,
+              "name": null,
+              "time_s": 0.8076539998095489
+            },
+            {
+              "coords": [
+                [
+                  10.0011804,
+                  53.5430551
+                ],
+                [
+                  10.0011541,
+                  53.5430483
+                ]
+              ],
+              "cost_s": 1.114780595579489,
+              "highway": "pedestrian",
+              "length_m": 1.8951270124851312,
+              "name": null,
+              "time_s": 1.114780595579489
+            },
+            {
+              "coords": [
+                [
+                  10.0011541,
+                  53.5430483
+                ],
+                [
+                  10.0011586,
+                  53.543042
+                ]
+              ],
+              "cost_s": 0.44765763313384244,
+              "highway": "pedestrian",
+              "length_m": 0.7610179763275321,
+              "name": null,
+              "time_s": 0.44765763313384244
+            },
+            {
+              "coords": [
+                [
+                  10.0011586,
+                  53.543042
+                ],
+                [
+                  10.0013477,
+                  53.5427736
+                ]
+              ],
+              "cost_s": 19.03217581381663,
+              "highway": "pedestrian",
+              "length_m": 32.35469888348827,
+              "name": null,
+              "time_s": 19.03217581381663
+            },
+            {
+              "coords": [
+                [
+                  10.0013477,
+                  53.5427736
+                ],
+                [
+                  10.0013562,
+                  53.5427612
+                ]
+              ],
+              "cost_s": 0.8757745167513695,
+              "highway": "pedestrian",
+              "length_m": 1.4888166784773282,
+              "name": null,
+              "time_s": 0.8757745167513695
+            },
+            {
+              "coords": [
+                [
+                  10.0013562,
+                  53.5427612
+                ],
+                [
+                  10.0014768,
+                  53.5425892
+                ]
+              ],
+              "cost_s": 12.187771147056758,
+              "highway": "pedestrian",
+              "length_m": 20.719210949996487,
+              "name": null,
+              "time_s": 12.187771147056758
+            },
+            {
+              "coords": [
+                [
+                  10.0014768,
+                  53.5425892
+                ],
+                [
+                  10.0014814,
+                  53.5425821
+                ]
+              ],
+              "cost_s": 0.497630732544616,
+              "highway": "pedestrian",
+              "length_m": 0.8459722453258471,
+              "name": null,
+              "time_s": 0.497630732544616
+            },
+            {
+              "coords": [
+                [
+                  10.0014814,
+                  53.5425821
+                ],
+                [
+                  10.0014982,
+                  53.542586
+                ]
+              ],
+              "cost_s": 0.7010352804302622,
+              "highway": "steps",
+              "length_m": 1.1917599767314457,
+              "name": null,
+              "time_s": 0.7010352804302622
+            },
+            {
+              "coords": [
+                [
+                  10.0014982,
+                  53.542586
+                ],
+                [
+                  10.0015647,
+                  53.5425993
+                ]
+              ],
+              "cost_s": 2.7345424495266406,
+              "highway": "aed_access",
+              "length_m": 4.648722164195289,
+              "name": null,
+              "time_s": 2.7345424495266406
+            }
+          ],
+          "euclidean_distance_m": 68.27174489114414,
+          "rank": 1,
+          "total_cost_s": 45.20377224720071,
+          "total_length_m": 76.8464128202412,
+          "total_time_s": 45.20377224720071
+        }
+      ]
+    }
+  }
+}

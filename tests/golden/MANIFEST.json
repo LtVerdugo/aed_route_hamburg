@@ -1,0 +1,16 @@
+{
+  "case_ids": [
+    "dense_urban",
+    "boundary_edge",
+    "clausewitz_kaserne",
+    "water_point",
+    "isolated_stays_empty_a",
+    "isolated_stays_empty_b",
+    "isolated_flip_c",
+    "isolated_flip_d",
+    "isolated_partial_e"
+  ],
+  "generated_with_commit": "adf2f53f15158a68a68770f3f71c3d869e0105fc",
+  "generator_script": "scripts/generate_golden_routes.py",
+  "note": "Baseline generado ANTES de cualquier fix (Fases 6/7/8). No editar los .json de tests/golden/ a mano — regenerar con este script y revisar el diff explícitamente."
+}

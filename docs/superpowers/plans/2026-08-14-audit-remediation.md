@@ -473,31 +473,30 @@ Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
 - Produces: golden files versionados que las Fases 6 y 7 usan como oráculo
   de no-regresión
 
-- [ ] **Paso 1:** Script que llama a `POST /api/route` para un conjunto fijo
-      de orígenes × 3 modos y guarda las respuestas completas como golden
-      files versionados. Casos límite obligatorios: centro urbano denso,
-      borde del boundary administrativo, zona de la Clausewitz-Kaserne
-      (53.5624°N, 9.8327°E — caso documentado de "sin red accesible"), y un
-      punto sobre agua (a determinar coordenada real tras confirmar con
-      `data/processed/hamburg_boundary.geojson`, no inventar una).
-- [ ] **Paso 2:** Test de admisibilidad de la heurística sobre un mini-grafo
-      sintético con coordenadas conocidas (no el grafo de producción): construir
-      un `nx.MultiDiGraph` de juguete con `x`/`y` y pesos de coste conocidos
-      de antemano, y verificar `heuristic(u, target) <= coste_real_mínimo(u,
-      target)` para todos los pares — este test debe FALLAR contra la
-      implementación actual de `routing.py` (documentando así, en rojo, el
-      propio bug C2 antes de tocarlo en la Fase 6).
-- [ ] **Paso 3:** Generar el baseline de golden files contra el estado
-      ACTUAL del código (antes de la Fase 6) y confirmar al usuario que está
-      guardado, mostrando el listado de archivos generados.
-- [ ] **Paso 4:** Commit.
+- [x] **Paso 1:** Script `scripts/generate_golden_routes.py`. 9 orígenes ×
+      3 modos (dense_urban, boundary_edge, clausewitz_kaserne, water_point,
+      + 5 casos de componente aislada, 3 de ellos con expectativa de cambio
+      tras la Fase 7). Punto de agua confirmado MIDIENDO (236.4 m, tras
+      descartar 3 candidatos que sí snapeaban a muelles/ferris reales).
+- [x] **Paso 2:** `tests/test_heuristic_admissibility.py`. Réplica de la
+      heurística actual (closure no importable). Caso grado 1: FALLA hoy
+      (h=141.42 > real=117.65). Caso grado 2 añadido (no estaba en el plan
+      original, pedido por el usuario): demuestra ruta subóptima
+      reproducible, pasa hoy (documenta el riesgo, no lo repara).
+- [x] **Paso 3:** Baseline generado contra el commit `adf2f53`. Determinismo
+      verificado en dos niveles: doble generación mismo proceso, y
+      regeneración tras reiniciar el servidor (proceso nuevo) — idéntico
+      byte a byte en ambos casos.
+- [x] **Paso 4:** Commit.
 
   ```bash
   git add tests/ scripts/generate_golden_routes.py
   git commit -m "test: arnés de regresión (golden routes) y test de admisibilidad de heurística (prep. para C2/C3)"
   ```
 
-- [ ] **Paso 5:** `verification-before-completion` + smoke test.
+- [x] **Paso 5:** `verification-before-completion` + smoke test. `GET /`
+      200, sin procesos huérfanos. `routing.py`, `app.py` y `src/aed_route/`
+      confirmados sin tocar.
 
 ---
 

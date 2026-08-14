@@ -1,0 +1,23 @@
+{
+  "case_id": "isolated_flip_d",
+  "description": "Componente aislada D (fuera del gigante, pero con nodo gigante a 43.9 m)",
+  "expectation_fase7": {
+    "outcome": "expected_change",
+    "reason": "Igual mecanismo que isolated_flip_c. Nodo gigante real a 43.9 m — dentro de MAX_SNAP_DISTANCE_M, debería flipear a resultado."
+  },
+  "origin": {
+    "lat": 53.557148,
+    "lon": 9.960321
+  },
+  "results": {
+    "bike": {
+      "results": []
+    },
+    "car": {
+      "results": []
+    },
+    "walk": {
+      "results": []
+    }
+  }
+}

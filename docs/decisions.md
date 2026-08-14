@@ -424,3 +424,73 @@ métrica correcta para decidir si la opción (iv) merece implementarse, pero
 no debe leerse ni comunicarse como "97,8% de consultas con éxito" — son
 dos cosas distintas. Anotado explícitamente para que no se malinterprete
 al llevarlo a discusión de equipo.
+
+---
+
+## 2026-08-14 — Fase 5: arnés de regresión creado — cierra: preparación de C2 (Fase 6) y C3 (Fase 7)
+
+**Dependencia de test:** `pytest>=8.0,<9.0` (rango acotado, no abierto —
+instalado 8.4.2) en `requirements-dev.txt`, archivo nuevo y separado de
+`requirements.txt` — no se instala en producción.
+
+**Golden files** (`tests/golden/*.json`, generados con
+`scripts/generate_golden_routes.py`, commit `adf2f53`, registrado en
+`tests/golden/MANIFEST.json`): 9 orígenes × 3 modos, JSON con claves
+ordenadas e indentado para diffs legibles. Cada caso lleva grabada su
+propia `expectation_fase7` (`no_change` / `expected_change` /
+`expected_improvement`) con el motivo — la predicción se escribió ANTES de
+tocar el snapping de origen en la Fase 7, no se interpretará a posteriori:
+
+- `dense_urban`, `boundary_edge`: funcionan hoy (walk/bike con resultado,
+  car=0 estructural) — `no_change` esperado.
+- `clausewitz_kaserne`: sin ningún nodo a ≤100 m del punto documentado en
+  `routing_methodology.md` — nodo del componente gigante más cercano a
+  164,8 m, sigue fuera de rango tras la Fase 7 — `no_change`.
+- `water_point` (53.5080, 9.9350): verificado MIDIENDO, no asumido —
+  3 de 4 candidatos en el Elba snapearon a infraestructura real (muelles/
+  ferris); este quedó confirmado a 236,4 m del nodo más cercano —
+  `no_change`.
+- `isolated_stays_empty_a`/`b`: snapean hoy a un nodo fuera del componente
+  gigante general; su nodo gigante real más cercano está a 186,4 m / 342,3
+  m — fuera de `MAX_SNAP_DISTANCE_M` incluso tras el filtro de la Fase 7 —
+  `no_change` (aislamiento genuino, no solo snap mal filtrado).
+- `isolated_flip_c`/`d`: mismo mecanismo, pero su nodo gigante real está a
+  6,4 m / 43,9 m — dentro de rango — `expected_change`. Si estos dos NO
+  cambian tras la Fase 7, el filtro de componente gigante no está
+  funcionando.
+- `isolated_partial_e`: único caso con resultado parcial hoy (walk=1,
+  bike=0, car=0) por conectividad interna de su propia componente aislada;
+  nodo gigante a 14,2 m — `expected_improvement`. El golden guarda la
+  respuesta COMPLETA (no solo el conteo) para que la Fase 7 pueda comparar
+  si mejora la calidad de la ruta, no solo la cantidad.
+
+**Determinismo verificado en dos niveles** (no solo dentro del mismo
+proceso, que hubiera sido insuficiente): (1) doble generación completa
+contra el mismo servidor en ejecución — idéntico byte a byte; (2)
+generación repetida tras **reiniciar** el servidor (proceso nuevo) para
+`dense_urban` e `isolated_partial_e` — idéntico byte a byte también. Un
+orden de iteración dependiente del proceso se habría detectado en esta
+segunda comprobación, no en la primera.
+
+**Test de admisibilidad** (`tests/test_heuristic_admissibility.py`):
+`routing.py` define su heurística como closure interna de
+`find_nearest_aeds`, no importable sin tocar el archivo (prohibido en esta
+fase) — el test replica la fórmula actual explícitamente, documentando que
+es una copia y que debe sincronizarse cuando la Fase 6 toque el original.
+Dos casos:
+- Destino de grado 1 (topología real de un AED): **FALLA hoy, como se
+  esperaba** — `h=141.42 > coste_real=117.65` en el nodo de origen del
+  mini-grafo sintético, viola `h(n) <= h*(n)` por el problema
+  metros-vs-segundos (aislado deliberadamente del bug de CRS ya conocido
+  como C2, que es un problema distinto).
+- Destino de grado 2 (topología hipotética, no la actual): **PASA hoy**
+  — demuestra de forma concreta y reproducible (no solo teórica) que
+  `nx.astar_path` devolvería una ruta subóptima (coste 1050 vs. óptimo
+  real 1010) si un AED tuviera alguna vez más de un nodo de acceso. Sirve
+  de guardarraíl de regresión para cualquier futura implementación de la
+  opción (iv) del modo car.
+
+Ningún archivo de `src/aed_route/` ni `app/app.py` se tocó en esta fase
+(verificado por `git status` antes de commitear) — solo `tests/`,
+`scripts/`, `pytest.ini`, `requirements-dev.txt` y `.gitignore`
+(añadido `.pytest_cache/`).

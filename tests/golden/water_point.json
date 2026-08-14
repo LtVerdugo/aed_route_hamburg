@@ -1,0 +1,23 @@
+{
+  "case_id": "water_point",
+  "description": "Elba, canal sur del puerto entre Neuhof y Waltershof",
+  "expectation_fase7": {
+    "outcome": "no_change",
+    "reason": "Verificado midiendo (no asumido por geografía — el Elba tiene muelles/ferris mapeados que sí snapean): distancia real al nodo más cercano = 236.4 m, muy por encima de MAX_SNAP_DISTANCE_M. Sin snap antes ni después de la Fase 7."
+  },
+  "origin": {
+    "lat": 53.508,
+    "lon": 9.935
+  },
+  "results": {
+    "bike": {
+      "results": []
+    },
+    "car": {
+      "results": []
+    },
+    "walk": {
+      "results": []
+    }
+  }
+}

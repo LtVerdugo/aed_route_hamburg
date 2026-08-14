@@ -1,0 +1,4 @@
+# Dependencias de desarrollo/test — NO se instalan en producción.
+# Separado deliberadamente de requirements.txt (ver docs/decisions.md,
+# Fase 5, 2026-08-14).
+pytest>=8.0,<9.0

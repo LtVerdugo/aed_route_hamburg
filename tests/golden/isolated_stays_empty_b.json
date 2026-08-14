@@ -1,0 +1,23 @@
+{
+  "case_id": "isolated_stays_empty_b",
+  "description": "Componente aislada B (130 nodos, fuera del componente gigante)",
+  "expectation_fase7": {
+    "outcome": "no_change",
+    "reason": "Igual mecanismo que isolated_stays_empty_a. Nodo gigante más cercano a 342.3 m — sigue sin snap tras la Fase 7."
+  },
+  "origin": {
+    "lat": 53.536808,
+    "lon": 9.918439
+  },
+  "results": {
+    "bike": {
+      "results": []
+    },
+    "car": {
+      "results": []
+    },
+    "walk": {
+      "results": []
+    }
+  }
+}

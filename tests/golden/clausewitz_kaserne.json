@@ -1,0 +1,23 @@
+{
+  "case_id": "clausewitz_kaserne",
+  "description": "Zona militar Clausewitz-Kaserne (documentada en routing_methodology.md)",
+  "expectation_fase7": {
+    "outcome": "no_change",
+    "reason": "Verificado (Fase 5, 2026-08-14): NO hay ningún nodo a <=100 m de este punto exacto — el snap ya falla hoy antes de llegar a elegir ningún componente. El nodo del componente gigante más cercano está a 164.8 m, fuera de MAX_SNAP_DISTANCE_M incluso tras el filtro de la Fase 7. Seguirá vacío."
+  },
+  "origin": {
+    "lat": 53.5624,
+    "lon": 9.8327
+  },
+  "results": {
+    "bike": {
+      "results": []
+    },
+    "car": {
+      "results": []
+    },
+    "walk": {
+      "results": []
+    }
+  }
+}

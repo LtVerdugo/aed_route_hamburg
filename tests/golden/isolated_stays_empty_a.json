@@ -1,0 +1,23 @@
+{
+  "case_id": "isolated_stays_empty_a",
+  "description": "Componente aislada A (149 nodos, fuera del componente gigante)",
+  "expectation_fase7": {
+    "outcome": "no_change",
+    "reason": "Snapea hoy (dist. 0 m) a un nodo fuera del componente gigante general. El nodo gigante real más cercano está a 186.4 m — fuera de MAX_SNAP_DISTANCE_M incluso tras el filtro de la Fase 7. Seguirá vacío en los 3 modos: es un caso de aislamiento genuino, no solo un snap mal filtrado."
+  },
+  "origin": {
+    "lat": 53.577362,
+    "lon": 9.881057
+  },
+  "results": {
+    "bike": {
+      "results": []
+    },
+    "car": {
+      "results": []
+    },
+    "walk": {
+      "results": []
+    }
+  }
+}

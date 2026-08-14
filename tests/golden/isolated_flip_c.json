@@ -1,0 +1,23 @@
+{
+  "case_id": "isolated_flip_c",
+  "description": "Componente aislada C (fuera del gigante, pero con nodo gigante a 6.4 m)",
+  "expectation_fase7": {
+    "outcome": "expected_change",
+    "reason": "Hoy: 0 resultados en los 3 modos (snapea fuera del componente gigante). El nodo del componente gigante real está a solo 6.4 m — tras el filtro de origen de la Fase 7, el snap debería caer ahí en vez de en el nodo aislado, y el resultado debería pasar de vacío a con ruta (al menos en walk/bike). Si este golden NO cambia tras la Fase 7, el filtro no está funcionando."
+  },
+  "origin": {
+    "lat": 53.576829,
+    "lon": 9.884691
+  },
+  "results": {
+    "bike": {
+      "results": []
+    },
+    "car": {
+      "results": []
+    },
+    "walk": {
+      "results": []
+    }
+  }
+}
