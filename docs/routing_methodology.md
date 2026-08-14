@@ -370,19 +370,88 @@ The candidate with the lowest network cost is selected as the result.
 
 ### Why A* and not Dijkstra
 
-Both algorithms guarantee the optimal shortest path. A* is preferred 
-because it uses a Euclidean heuristic h(n) to prioritise nodes in 
-the direction of the destination, typically exploring 60-80% fewer 
-nodes than Dijkstra for the same result on geographic networks.
+Both algorithms guarantee the optimal shortest path, **provided the
+heuristic is admissible** (see correction below — this was not always the
+case in this project).
 
 The evaluation function is:
 
   f(n) = g(n) + h(n)
 
-where g(n) is the accumulated cost from the origin and h(n) is the 
-straight-line distance to the destination node. This heuristic is 
-admissible — it never overestimates the true cost — which guarantees 
-optimality.
+where g(n) is the accumulated cost from the origin and h(n) is an estimate
+of the remaining cost to the destination node.
+
+**Correction (2026-08-14, Fase 6 of the audit remediation — see
+`docs/decisions.md` for the full history):** before this date, h(n) was
+the straight-line distance **in metres**, read directly from the graph's
+own node attributes (`G.nodes[u]['x'/'y']`), while the A* weight (`cost_s`)
+is in **seconds**. This had two compounding problems, both now fixed:
+
+1. **Units mismatch.** A distance in metres is not comparable to a cost in
+   seconds. Since every mode travels at more than 1 m/s, distance in
+   metres numerically exceeds the true minimum time cost for any edge of
+   positive length — the heuristic overestimated, i.e. it was **not
+   admissible**, and A* could no longer guarantee the optimal path.
+2. **Inconsistent coordinate reference system.** Regular road nodes keep
+   OSMnx's original WGS84 degrees in their `x`/`y` attributes (the graph is
+   never reprojected — see `graph_builder_osm.py`); only AED nodes, added
+   later, get `x`/`y` in EPSG:25832 metres. Reading `G.nodes[...]` directly
+   therefore mixed degrees and metres depending on which node was involved,
+   which for every real query (always evaluating distance *to* an AED
+   node) produced a heuristic value dominated by an enormous, essentially
+   constant offset (~5.97 million in this graph) — see the `Fase 1` entry
+   in `docs/decisions.md` for the precise mechanism.
+
+**Why this did not, in practice, return wrong routes before the fix:**
+every AED node has exactly one incoming edge (its single access edge — see
+"AED and Origin Snapping" below), and `nx.astar_path` returns as soon as
+it pops the target node from its priority queue. Because the mixed-CRS
+heuristic was near-constant across all *regular* nodes, the search still
+explored them in true cost order (as Dijkstra would); the AED node was
+then relaxed exactly once, via its one real predecessor, at that
+predecessor's true optimal cost, and immediately returned. **This
+guarantee depends entirely on AED nodes having exactly one access edge.**
+If an AED were ever connected to more than one access node (e.g. a
+mode-dependent snap for `car`, see the open `docs/decisions.md` entry on
+that mode), the same inadmissible heuristic could make A* return via a
+more expensive predecessor discovered first, silently skipping a cheaper
+one discovered later — this exact scenario is now a permanent regression
+test, see `tests/test_heuristic_admissibility.py`.
+
+**The fix:** `h(n)` now reads coordinates from `nodes_df` (via a
+`node_key -> (x, y)` lookup built once and cached), never from
+`G.nodes[...]` — `nodes_df` projects every node, road and AED alike,
+consistently to EPSG:25832 metres (verified against the actual loaded
+graph before writing this fix: 100% of 657,870 road nodes and 139 AED
+nodes fall within a plausible metric range for this CRS in northern
+Europe; zero degree-scale values). The distance is then divided by the
+**maximum** speed achievable by the mode in the network (not the average):
+dividing by the maximum keeps h(n) an underestimate of the true minimum
+time cost for every edge, which is what admissibility requires — dividing
+by the average would overestimate the cost of any edge faster than
+average and reintroduce the same problem. For walk and bike this is the
+existing `WALK_SPEED_M_S`/`BIKE_SPEED_M_S` constants, each verified
+against the loaded graph to be the true network maximum for that mode
+(walk: exactly 1.7 m/s on 100% of measured edges; bike: 4.5 m/s maximum,
+with the AED access edges' known 1.7 m/s quirk — see the open
+methodology question above — still safely below that maximum). Car has no
+single constant; its maximum (33.33 m/s / 120 km/h) is **measured directly
+from the loaded graph's edges** rather than assumed, and cached at the
+module level to avoid rescanning ~646,000 edges per request.
+
+**Measured effect:** after the fix, A* explores visibly fewer nodes for
+the same query — e.g. 2,560 → 255 nodes for a representative walk query
+in the city centre (≈90% fewer), 43,229 → 9,008 for a query near the
+administrative boundary (≈79% fewer). This is the first time this
+project's A* has actually benefited from heuristic guidance rather than
+behaving close to plain Dijkstra — the "60-80% fewer nodes than Dijkstra"
+claim below was aspirational before this fix, not measured.
+
+A* is preferred over plain Dijkstra because an admissible heuristic
+prioritises nodes in the direction of the destination, typically exploring
+60-80% fewer nodes than Dijkstra for the same result on geographic
+networks — this is now actually true of this implementation, not just of
+A* in general.
 
 ### Why K=5
 

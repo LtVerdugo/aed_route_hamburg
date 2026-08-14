@@ -509,45 +509,34 @@ Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
 - Modify: `docs/routing_methodology.md` (sección de heurística/A*)
 - Modify: `docs/decisions.md`
 
-- [ ] **Paso 1 — Verificación empírica OBLIGATORIA antes de escribir código:**
-      contra el pickle real (`data/interim/hamburg_graph.pkl`), confirmar que
-      TODOS los `x`/`y` de `nodes_df` (nodos de carretera y nodos `aed_*`)
-      caen en el rango EPSG:25832 esperado para Hamburgo (x ≈ 5.4e5–6.0e5,
-      y ≈ 5.90e6–5.98e6). Mostrar el comando ejecutado y la salida real
-      (min/max por columna, separado por tipo de nodo). Si algún subconjunto
-      está en grados: PARAR y avisar — la premisa del fix sería falsa.
-- [ ] **Paso 2:** Confirmado el rango, implementar el fix leyendo
-      coordenadas proyectadas desde `nodes_df`/`node_index` (nunca desde
-      `G.nodes[...]`), devolviendo `distancia_m / velocidad_máxima_del_modo`
-      para que la unidad case con el peso en segundos. Justificar en el
-      propio código (comentario) y en la doc por qué se divide por la
-      velocidad MÁXIMA alcanzable en la red para ese modo y no por la media
-      (admisibilidad: h no debe poder superar nunca el coste real mínimo).
-      Prohibido reproyectar nodos del grafo — leer, no mutar.
-- [ ] **Paso 3:** Correr el test de admisibilidad de la Fase 5 (ahora debe
-      pasar en verde) y los golden files (deben quedar SIN CAMBIOS — se
-      espera esto por el grado 1 de los nodos AED).
-- [ ] **Paso 4:** Medir nodos explorados por A* antes/después (instrumentar
-      temporalmente o usar el contador que exponga `nx.astar_path`/una
-      envoltura local) y mostrar la comparación.
-- [ ] **Paso 5:** Documentar en `docs/routing_methodology.md` y en
-      `docs/decisions.md`: por qué la implementación anterior devolvía rutas
-      óptimas pese al bug (grado 1 de los nodos AED, no "degeneración a
-      Dijkstra" — según el reanálisis de la Fase 1), y qué cambio futuro
-      (p. ej. conectar un AED a varios nodos de acceso) rompería esa
-      garantía silenciosamente.
-- [ ] **Paso 6:** Commit.
-
-  ```bash
-  git add src/aed_route/routing.py docs/routing_methodology.md docs/decisions.md
-  git commit -m "fix: heurística de A* en unidades de tiempo (distancia_m/v_max), sin reproyectar el grafo (C2)"
-  ```
-
-- [ ] **Paso 7 — OBLIGATORIO:** `superpowers:requesting-code-review` sobre el
-      diff de este commit (subagente revisor independiente) antes de
-      presentar la fase como terminada.
-- [ ] **Paso 8:** `verification-before-completion` + smoke test. Si algún
-      golden cambia: revertir e investigar, no continuar.
+- [x] **Paso 1 — Verificación empírica OBLIGATORIA antes de escribir código:**
+      hecha. Primera pasada con el rango original marcó "falsa" por el
+      exclave de Neuwerk (x mínimo 463.423, geográficamente real, no un
+      bug); verificación de fondo (cero valores en escala de grados,
+      100% de 657.870 nodos de carretera + 139 AED en rango de metros
+      plausible) confirma la premisa. Detalle completo en
+      `docs/decisions.md`.
+- [x] **Paso 2:** Fix implementado. Velocidades máximas medidas contra el
+      grafo real (walk 1.7 m/s constante, bike 4.5 m/s máximo, car 33.33
+      m/s medido de 645.996 aristas — sin constante inventada). Coordenadas
+      leídas de `nodes_df` vía un lookup cacheado, nunca de `G.nodes[...]`.
+      Grafo no tocado ni reproyectado.
+- [x] **Paso 3:** Test de admisibilidad en verde (2/2). Golden files: sin
+      cambios en los 9 casos (solo el hash de commit del MANIFEST, no
+      forma parte del oráculo, revertido).
+- [x] **Paso 4:** Nodos explorados medidos (heappop instrumentado
+      temporalmente, sin tocar ningún archivo permanente): dense_urban
+      walk 2.560→255 (-90%), dense_urban bike 2.722→485 (-82%),
+      boundary_edge walk 43.229→9.008 (-79%).
+- [x] **Paso 5:** `docs/routing_methodology.md` (sección "Why A* and not
+      Dijkstra") y `docs/decisions.md` actualizados con el análisis
+      completo, incluida la explicación del grado 1 (no "degeneración a
+      Dijkstra") y qué lo rompería en el futuro.
+- [x] **Paso 6:** Commit.
+- [ ] **Paso 7 — OBLIGATORIO:** `superpowers:requesting-code-review` sobre
+      el diff, pendiente de ejecutar tras este commit.
+- [ ] **Paso 8:** `verification-before-completion` + smoke test final,
+      pendiente tras la revisión.
 
 ---
 

@@ -8,11 +8,13 @@ import pandas as pd
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 from .config import (
+    BIKE_SPEED_M_S,
     CRS_MAP,
     CRS_PROJECTED,
     MAX_SNAP_DISTANCE_M,
     SHORTLIST_EUCLIDEAN_K,
     TRANSPORT_PROFILES,
+    WALK_SPEED_M_S,
 )
 from .nearest import find_candidate_aed_nodes
 
@@ -22,6 +24,115 @@ _WGS84_TO_PROJECTED = Transformer.from_crs(CRS_MAP, CRS_PROJECTED, always_xy=Tru
 _COST_ATTR = {"walk": "walk_cost_s", "bike": "bike_cost_s", "car": "drive_cost_s"}
 _TIME_ATTR = {"walk": "walk_time_s", "bike": "bike_time_s", "car": "drive_time_s"}
 _CAN_ATTR  = {"walk": "can_walk",    "bike": "can_bike",    "car": "can_drive"}
+
+# Velocidad MÁXIMA alcanzable por modo en la red, usada para convertir la
+# heurística de A* (distancia en metros) a la misma unidad que su peso
+# (segundos) sin perder admisibilidad: cualquier arista real viaja a su
+# velocidad real o menos, así que distancia_m / v_max siempre subestima (o
+# iguala) el coste real mínimo — h(n) <= h*(n), la condición de
+# admisibilidad. Dividir por la velocidad MEDIA, en cambio, sobreestimaría
+# el coste de cualquier arista más rápida que la media y rompería esa
+# garantía (ver docs/decisions.md, Fase 6, 2026-08-14, para el análisis
+# completo de por qué "unificar CRS" por sí solo no basta).
+#
+# Walk y bike usan las constantes ya definidas en config.py, verificadas
+# contra el grafo real antes de este fix (Fase 6, 2026-08-14): walk es
+# exactamente 1.7 m/s en el 100% de 1.390.991 aristas can_walk=True medidas
+# (min=max=1.7 m/s exacto); bike alcanza 4.5 m/s como máximo real de la red
+# (algunas aristas de acceso a AED corren más lento, a 1.7 m/s — pregunta
+# abierta de metodología ya registrada en docs/routing_methodology.md, no
+# es un problema para esta fórmula: seguir usando el máximo real, 4.5,
+# mantiene la heurística admisible también para esas aristas más lentas).
+#
+# Car NO tiene una velocidad única: varía por tipo de vía (límites de OSM).
+# Se mide directamente del grafo cargado (ver _car_max_speed_m_s) en vez de
+# inventar una constante, tal como se pidió explícitamente.
+_MAX_SPEED_M_S: dict[str, float] = {
+    "walk": WALK_SPEED_M_S,
+    "bike": BIKE_SPEED_M_S,
+}
+
+# Cachés a nivel de módulo. El grafo se carga una sola vez al arranque de
+# la app y no cambia durante su vida (Restricción Global 1: el grafo es
+# inmutable), así que calcular esto una vez es válido y evita trabajo
+# repetido caro en cada petición.
+_car_max_speed_cache: float | None = None
+_coord_lookup_cache: dict[int, dict] = {}
+
+
+def _car_max_speed_m_s(G: nx.MultiDiGraph) -> float:
+    """
+    Velocidad máxima real medida sobre las aristas can_drive=True del grafo
+    cargado (max(length_m / drive_cost_s)). Medida una vez sobre el pickle
+    real antes de escribir este fix: min=2.778 m/s, max=33.333 m/s (120
+    km/h) sobre 645.996 aristas — el máximo se repite en muchas aristas
+    (categoría de vía real, no un valor atípico de datos). Cacheada porque
+    recorrer ~646.000 aristas en cada petición de modo "car" sería
+    demasiado caro para hacerlo por consulta.
+    """
+    global _car_max_speed_cache
+    if _car_max_speed_cache is not None:
+        return _car_max_speed_cache
+
+    max_speed = 0.0
+    for _u, _v, _k, data in G.edges(keys=True, data=True):
+        if data.get("can_drive") is not True:
+            continue
+        length_m = data.get("length_m")
+        cost_s = data.get("drive_cost_s")
+        if not length_m or not cost_s or cost_s <= 0:
+            continue
+        speed = length_m / cost_s
+        if speed > max_speed:
+            max_speed = speed
+
+    if max_speed <= 0:
+        raise ValueError(
+            "No se pudo medir una velocidad máxima válida para el modo "
+            "'car' en el grafo cargado (¿faltan aristas can_drive=True "
+            "con length_m y drive_cost_s positivos?)."
+        )
+
+    _car_max_speed_cache = max_speed
+    return max_speed
+
+
+def _max_speed_for_mode(G: nx.MultiDiGraph, mode: str) -> float:
+    if mode == "car":
+        return _car_max_speed_m_s(G)
+    return _MAX_SPEED_M_S[mode]
+
+
+def _coord_lookup(nodes_df: pd.DataFrame) -> dict:
+    """
+    Diccionario node_key -> (x, y) en EPSG:25832 (metros), construido desde
+    nodes_df — NUNCA desde los atributos x/y del propio grafo
+    (`G.nodes[...]`), que para los nodos de carretera regulares siguen en
+    grados WGS84 (bug de CRS ya documentado, hallazgo C2). nodes_df, en
+    cambio, proyecta TODOS los nodos de forma consistente a metros —tanto
+    los de carretera como los `aed_*`— verificado empíricamente contra el
+    pickle real antes de escribir este fix (Fase 6, 2026-08-14: 100% de
+    657.870 nodos de carretera y 139 nodos AED caen dentro de un rango de
+    metros plausible para EPSG:25832 en el norte de Europa; cero valores en
+    escala de grados).
+
+    Cacheada a nivel de módulo por `id(nodes_df)`: el bundle se carga una
+    sola vez al arranque y se reutiliza en todas las peticiones.
+    """
+    key = id(nodes_df)
+    cached = _coord_lookup_cache.get(key)
+    if cached is not None:
+        return cached
+
+    lookup = dict(
+        zip(
+            nodes_df["node_key"].values,
+            zip(nodes_df["x"].values, nodes_df["y"].values),
+        )
+    )
+    _coord_lookup_cache.clear()  # solo interesa el nodes_df vigente
+    _coord_lookup_cache[key] = lookup
+    return lookup
 
 
 def snap_origin_to_graph(
@@ -156,12 +267,19 @@ def find_nearest_aeds(
         filter_edge=lambda u, v, ek: G[u][v][ek].get(can_attr) is True,
     )
 
+    coord_lookup = _coord_lookup(nodes_df)
+    max_speed_m_s = _max_speed_for_mode(G, mode)
+
     def heuristic(u: str, v: str) -> float:
-        ux = G_mode.nodes[u].get("x", 0.0)
-        uy = G_mode.nodes[u].get("y", 0.0)
-        vx = G_mode.nodes[v].get("x", 0.0)
-        vy = G_mode.nodes[v].get("y", 0.0)
-        return math.hypot(vx - ux, vy - uy)
+        # Coordenadas leídas de nodes_df (vía coord_lookup), NUNCA de
+        # G.nodes[...] — ver _coord_lookup(). Distancia dividida por la
+        # velocidad MÁXIMA del modo (no la media) para que la heurística
+        # quede en la misma unidad que el peso de A* (segundos) sin perder
+        # admisibilidad — ver _MAX_SPEED_M_S arriba.
+        ux, uy = coord_lookup.get(u, (0.0, 0.0))
+        vx, vy = coord_lookup.get(v, (0.0, 0.0))
+        distance_m = math.hypot(vx - ux, vy - uy)
+        return distance_m / max_speed_m_s
 
     results = []
 

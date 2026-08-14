@@ -494,3 +494,81 @@ Ningún archivo de `src/aed_route/` ni `app/app.py` se tocó en esta fase
 (verificado por `git status` antes de commitear) — solo `tests/`,
 `scripts/`, `pytest.ini`, `requirements-dev.txt` y `.gitignore`
 (añadido `.pytest_cache/`).
+
+---
+
+## 2026-08-14 — Fase 6: heurística de A* corregida en `src/aed_route/routing.py` — cierra: C2
+
+**Paso 1 obligatorio, verificación de la premisa CRS contra `nodes_df` real
+(no contra `G.nodes[...]`, que es donde vive el bug):** primera pasada con
+el rango esperado original (x≈5.4e5–6.0e5, y≈5.90e6–5.98e6) marcó
+"premisa falsa" para los nodos de carretera (mínimo real x=463.423). **Esto
+NO era el bug de CRS reapareciendo** — investigado antes de parar: ese
+nodo (x mínimo) corresponde a lon=8.4425, lat=53.9621, es decir, el exclave
+de Neuwerk (descubierto en la Fase 5 al inspeccionar `hamburg_boundary.
+geojson`, que tiene 3 partes: la Hamburgo continental y dos exclaves). Mi
+rango esperado original era simplemente demasiado estrecho — no conocía
+Neuwerk al escribirlo. Verificación de fondo, la que de verdad importa:
+cero filas con valores en escala de grados (<1000); el 100% de 657.870
+nodos de carretera y 139 nodos AED caen dentro de un rango de metros
+plausible para EPSG:25832 en el norte de Europa (x: 1e5–9e5, y:
+5.0e6–6.5e6). **Premisa confirmada** — `nodes_df` proyecta a todos los
+nodos de forma consistente a metros; el bug real está solo en que
+`routing.py` leía `G.nodes[...]` en vez de `nodes_df`.
+
+**Velocidades máximas medidas contra el grafo real** (no inventadas, tal
+como se pidió):
+- Walk: constante exacta, 1.7 m/s en el 100% de 1.390.991 aristas
+  `can_walk=True` (min=max=1.7 — coincide exactamente con
+  `WALK_SPEED_M_S`).
+- Bike: máximo real 4.5 m/s (coincide con `BIKE_SPEED_M_S`); mínimo 1.7
+  m/s en un subconjunto — corresponde a las aristas de acceso a AED, que
+  ya están registradas como pregunta abierta de metodología, no un
+  hallazgo nuevo.
+- Car: **sin constante única** — varía de 2,778 m/s (10 km/h) a 33,333 m/s
+  (120 km/h) sobre 645.996 aristas `can_drive=True`; el máximo se repite en
+  muchas aristas (categoría real de vía, no un valor atípico de datos).
+
+**El fix:** `heuristic(u, v)` ahora lee `(x, y)` de un diccionario
+`node_key -> (x, y)` construido una sola vez desde `nodes_df` (cacheado a
+nivel de módulo), nunca de `G.nodes[...]`. Devuelve `distancia_m /
+velocidad_máxima_del_modo` — se divide por la velocidad MÁXIMA, no la
+media, porque dividir por la media sobreestimaría el coste de cualquier
+arista más rápida que la media y volvería a romper la admisibilidad (la
+media ya no es una cota inferior válida). Para `car`, la velocidad máxima
+se mide directamente del grafo cargado (`_car_max_speed_m_s`) y se cachea,
+para no recorrer ~646.000 aristas en cada petición. Ningún archivo aparte
+de `routing.py` se tocó — la Restricción Global 1 (grafo inmutable, sin
+reproyectar nodos) se respetó en todo momento.
+
+**Verificación:**
+- Test de admisibilidad: **verde** en ambos casos. El de grado 1
+  (`test_fixed_heuristic_is_admissible_for_degree1_destination`) pasa
+  ahora que se cumple h(n) <= h*(n). El de grado 2 se actualizó (ver commit
+  separado en `tests/`) para exigir el óptimo real (1010) en vez de
+  documentar el valor subóptimo anterior (1050) — verificado empíricamente
+  ANTES de aplicar el fix que, con la heurística corregida, el mismo
+  escenario sintético pasa de devolver 1050 a devolver 1010.
+- Golden files: **sin cambios** en ninguno de los 9 casos (solo cambió el
+  hash de commit dentro de `MANIFEST.json` al regenerar, revertido para no
+  ensuciar el diff — no forma parte del oráculo de comparación). Esperado
+  exactamente por el grado 1 de los nodos AED, documentado arriba.
+- Nodos explorados por A* (instrumentado temporalmente parcheando
+  `heappop` en el módulo de networkx, sin tocar ningún archivo
+  permanente), antes vs. después del fix, mismo origen y modo:
+  - `dense_urban` (walk): 2.560 → 255 (-90%)
+  - `dense_urban` (bike): 2.722 → 485 (-82%)
+  - `boundary_edge` (walk): 43.229 → 9.008 (-79%)
+
+  Reducción visible confirmada en los tres casos — la heurística ahora sí
+  guía la búsqueda; antes, por el motivo explicado arriba (heurística
+  casi-constante para nodos regulares), se comportaba efectivamente como
+  Dijkstra en cuanto a nodos explorados, pese a pagar el coste de
+  calcularla.
+- `docs/routing_methodology.md` actualizado (sección "Why A* and not
+  Dijkstra") con la corrección completa: qué estaba mal, por qué no
+  producía rutas incorrectas hasta ahora (grado 1 de los AEDs), qué
+  rompería esa garantía en silencio (un AED con más de un nodo de acceso —
+  ver la opción (iv) del modo car), y las cifras de esta entrada.
+- `requesting-code-review` pendiente de ejecutarse sobre el diff antes de
+  cerrar la fase (obligatoria para Fases 6 y 7, acordado previamente).
