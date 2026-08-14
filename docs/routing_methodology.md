@@ -596,24 +596,50 @@ different street than expected. This is a known limitation
 of the nearest-node approach and affects only cases where
 OSM has not mapped intermediate vertices on a segment.
 
-**AED snap NOT restricted to giant component — known gap, not yet fixed
-(corrected 2026-08-14):**
+**AED snap NOT restricted to giant component — origin side fixed in Fase
+7, AED side remains known, quantified technical debt (updated
+2026-08-14):**
 This section previously claimed that AED nodes are snapped only to nodes
-within the giant weakly connected component of the unified graph. That is
-not what the code does: `add_aed_nodes_to_graph`
-(`src/aed_route/graph_builder_osm.py`) builds its snapping `cKDTree` over
-*all* road nodes, with no connectivity filter — verified directly against
-the function body, and confirmed there is no `connected_components`/
-`weakly_connected` check anywhere in `graph_builder_osm.py` or
-`routing.py`. In practice, an AED whose nearest road node belongs to a
-small disconnected component gets connected to that unreachable node, and
-`find_nearest_aeds` will silently drop it as a candidate whenever
-`nx.astar_path` raises `NetworkXNoPath` — with no log entry today, so this
-failure mode is invisible unless investigated directly. Origin-side
-filtering to the giant component is planned for a later remediation phase;
-because the graph itself (including AED access edges) is not rebuilt as
-part of this remediation, the AED side of this gap is accepted as known
-technical debt rather than fixed — see `docs/decisions.md`.
+within the giant weakly connected component of the unified graph. That was
+never what `add_aed_nodes_to_graph` (`src/aed_route/graph_builder_osm.py`)
+does — its snapping `cKDTree` is built over *all* road nodes, with no
+connectivity filter, and this is unchanged by Fase 7 (the graph pickle is
+immutable for this remediation effort — `graph_builder_osm.py` was not
+touched).
+
+**Origin snapping was fixed in Fase 7 (2026-08-14)**: `snap_origin_to_graph`
+now receives a `node_index` already restricted to the giant weakly
+connected component (computed once at startup in `app/app.py`, cached as
+`data/processed/graph_giant_component_excluded_nodes.json` — a derived
+artifact, not a graph modification). A click near a small disconnected
+fragment now snaps to a real, reachable node instead of an isolated one
+that could never yield a route to any AED.
+
+**The AED side remains exactly as before, and its scale is now known**: 9
+of the 139 AED nodes in the graph are outside the giant component (logged
+as a WARNING with their node_keys at every startup — see
+`app/app.py`). These 9 are practically unreachable from almost any origin,
+in any mode, and `find_nearest_aeds` silently drops them as A* candidates
+whenever `nx.astar_path` raises `NetworkXNoPath` for them — that specific
+discard is no longer silent either: it is now logged (`INFO` level, see
+`src/aed_route/routing.py`), though the underlying unreachability is still
+not fixed. Fixing it requires rebuilding the graph's AED access edges,
+which is out of scope while the graph is immutable — accepted as known
+technical debt, with the count now quantified rather than unknown. See
+`docs/decisions.md` for the mechanism this uncovered (a previously
+invisible false-positive route, discussed under "Edge Cases and Observed
+Anomalies" below) and the argument it provides for a future rebuild
+discussion.
+
+**This "9" is a different metric from elsewhere in this document (e.g.
+"AED nodes skipped: 2" in the AED-snapping section above) — they are not
+the same count and should not be conflated or "reconciled" into one
+number.** The skipped-2 count is about AEDs that never became graph nodes
+at graph-build time (no road node within `MAX_SNAP_DISTANCE_M`). The
+9 discussed here ARE graph nodes, connected to the network — just to a
+small disconnected fragment of it. 141 AEDs sourced → 139 become graph
+nodes (2 skipped) → of those 139, 9 are practically unreachable (this
+section) and 130 sit in the giant component and route normally.
 
 ## Routing Logic Summary
 
@@ -735,6 +761,57 @@ route through military installations or restricted-access
 zones regardless of the emergency context. The absence of 
 isochrones in this area is a direct consequence of the 
 access=private exclusion rule, which is intentional.
+
+### Origin trapped in an isolated fragment — a route that looked excellent
+was a false positive (found while building the Fase 7 regression golden
+files, 2026-08-14)
+
+**How this was identified:** while selecting golden test cases for a
+fragment of the network known to sit outside the giant weakly connected
+component, one origin returned a suspiciously good result — 1 route, in
+walk mode, to an AED only 45.2 seconds away. On the surface this looked
+like a routing success story, not an edge case.
+
+**What we found:** both the origin's snapped node and the target AED were
+inside the *same* small disconnected fragment of the graph (a component of
+just a few dozen nodes, isolated from the main network). The 45.2-second
+route was entirely real *within that fragment* — but the fragment itself
+has no connection to the rest of Hamburg's usable network. Confirmed
+directly against the loaded graph: the AED in question (`aed_5880920245`)
+is one of the 9 AED nodes now known to sit outside the giant component
+(see "Giant component constraint" above). Before Fase 7, the origin
+snapped to whichever node was nearest in absolute terms, with no
+connectivity check — so it landed inside that same isolated fragment,
+and from there the short internal route to the equally-isolated AED
+looked, from the API response alone, like an ordinary successful query.
+
+**Why this matters more than an empty result would:** an origin that
+returns *zero* routes is at least visibly a failure — a user, or an
+automated test, can tell something is wrong. An origin that returns a
+short, plausible-looking route to a real AED, when that AED is in fact
+unreachable from anywhere a real person could actually be standing, is a
+**silent false positive** — worse than no answer, because it looks like a
+correct one. This was invisible before Fase 7 specifically because
+nothing checked whether the origin's own snap was inside the giant
+component in the first place.
+
+**What Fase 7 changed:** origin snapping is now restricted to the giant
+component (see above), so this exact origin now snaps to a real,
+reachable node instead, and correctly no longer returns a route to
+`aed_5880920245` — it returns routes to genuinely reachable AEDs instead,
+at a realistic (much longer) travel time. The false-positive AED simply
+disappears from the candidate list, as it should.
+
+**Why this is a real argument for eventually rebuilding the graph, not
+just a curiosity:** this failure mode is not limited to origins — any AED
+among the 9 outside the giant component could, in principle, produce the
+same kind of false positive for an origin that happens to share its
+isolated fragment. The origin-side fix in Fase 7 does not, and cannot,
+close this on the AED side (fixing it means re-snapping AED access edges,
+which requires rebuilding the immutable graph bundle — out of scope
+here). This case is the concrete evidence to bring to that future
+rebuild discussion: it is not hypothetical, it happened, and it was
+invisible until specifically investigated.
 
 ---
 

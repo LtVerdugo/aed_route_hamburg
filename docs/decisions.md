@@ -665,3 +665,103 @@ detectar diffs correctos es mala idea — se quiere el arnés estable
 mientras se usa como oráculo, no en construcción. Queda como mejora
 recomendada, con orden explícito de secuenciación (post-Fase 8), no como
 deuda con plazo.
+
+---
+
+## 2026-08-14 — Fase 7: filtro de componente gigante para el snapping de origen — cierra: C3 (parcial — lado origen; lado AED sigue como deuda, ahora cuantificada)
+
+**Implementación (sin tocar `graph_builder_osm.py` ni el pickle en ningún
+momento):**
+- `src/aed_route/nearest.py`: `compute_giant_component_node_keys(G)` (solo
+  lectura, `nx.weakly_connected_components`, ~0,72s medido sobre el grafo
+  real) y `filter_node_index_to_keys(node_index, allowed_keys)` (reconstruye
+  un `cKDTree` nuevo sobre el subconjunto permitido, sin mutar el
+  `node_index` original).
+- `app/app.py`: al arranque, calcula (o carga de caché) el componente
+  gigante; filtra el `node_index` usado por `snap_origin_to_graph` a esos
+  nodos; detecta qué nodos `aed_*` quedan fuera y loguea WARNING con sus
+  ids exactos.
+- `src/aed_route/routing.py`: `find_nearest_aeds` ahora loguea (nivel
+  INFO) cada vez que un candidato se descarta por `NetworkXNoPath` o
+  `NodeNotFound`, con modo, nodo de origen y nodo objetivo — antes de esta
+  fase ese descarte era completamente invisible.
+
+**Caché atada al checksum del pickle (verificación pedida explícitamente
+antes de cerrar la fase):** el artefacto derivado
+(`data/processed/graph_giant_component_excluded_nodes.json`) guarda el
+SHA-256 del pickle (`sha256_of_file`, nueva utilidad en
+`src/aed_route/utils.py`, ~0,7s medido sobre los 364 MB) junto con la
+lista de nodos excluidos. Al arranque, se recalcula el checksum del pickle
+actual y se compara contra el guardado en la caché — si no coincide, se
+loguea un WARNING explícito y se recalcula el componente gigante desde
+cero, en vez de confiar en una caché que podría referenciar un grafo
+distinto. Hoy el checksum nunca puede cambiar (grafo inmutable +
+`chmod 444`, Fase 0), así que esta rama nunca se ejecuta en la práctica —
+pero si algún día se hiciera un rebuild (p. ej. para la opción (iv) del
+modo car), una caché obsoleta habría dado resultados de snapping
+incorrectos en silencio sin este chequeo. Coste: el checksum se
+recalcula en CADA arranque (no solo cuando la caché falta), lo que en la
+práctica hace que "cachear" ya no ahorre mucho tiempo de reloj (el
+chequeo de checksum cuesta casi lo mismo que recalcular el componente
+gigante directamente) — se mantiene de todos modos por el rastro de
+auditoría que deja en `data/processed/`, no como optimización de
+rendimiento real.
+
+**Coste de arranque medido:** ~0,85s adicionales en total (0,7s checksum +
+~0,15s reconstruir el índice filtrado, esté o no la caché del componente
+gigante actualizada) — insignificante frente a los ~5s de carga del
+pickle y los ~20-30s documentados de arranque completo. Anotado también en
+`README_deploy.md`.
+
+**Los 9 AEDs fuera del componente gigante — cuantificados por primera vez,
+y una métrica DISTINTA de los "2 AEDs omitidos" ya documentados:** el log
+de arranque lista explícitamente los 9 node_keys:
+`aed_1630112176, aed_2318325116, aed_3336946741, aed_5880920245,
+aed_6276396178, aed_6276396179, aed_8840234226, aed_9828734877,
+aed_10045300175`. Esto NO es lo mismo que "AED nodes skipped: 2" (ya
+documentado en `docs/network_and_graph_build.md`/`routing_methodology.md`):
+esos 2 nunca llegaron a ser nodos del grafo (ningún nodo de carretera a
+menos de `MAX_SNAP_DISTANCE_M` en el momento de construir el grafo); estos
+9 SÍ son nodos reales del grafo, conectados a la red — solo que a un
+fragmento pequeño y aislado de ella, no a la red principal utilizable.
+Aritmética completa: 141 AEDs en la fuente → 139 se integran como nodos
+del grafo (2 omitidos) → de esos 139, 9 son prácticamente inalcanzables
+(este hallazgo) y 130 están en el componente gigante y enrutan con
+normalidad. Documentado con esta distinción explícita en ambos archivos
+de metodología, para que nadie intente "reconciliar" ambas cifras en una
+sola.
+
+**Mecanismo del caso `isolated_partial_e` — falso positivo, antes
+invisible, documentado como argumento para el rebuild:** antes de esta
+fase, ese origen snapeaba (a 0,036 m, prácticamente el punto exacto del
+click) a un nodo dentro de un fragmento aislado que tenía, por pura
+coincidencia topológica, conectividad interna hacia `aed_5880920245` —
+uno de los 9 AEDs fuera del componente gigante — devolviendo una ruta de
+apariencia excelente (45,2 s). Esa ruta era completamente real *dentro*
+del fragmento aislado, pero ese fragmento no tiene ninguna conexión con el
+resto de la red utilizable de Hamburgo: ningún origen real fuera de ese
+fragmento diminuto podría haber llegado nunca a ese AED por esa ruta. Era,
+en efecto, un **falso positivo silencioso** — peor que una lista vacía,
+porque parecía una respuesta correcta. Tras el fix de la Fase 7, el mismo
+origen ahora snapea (a 14,2 m) al nodo real más cercano dentro del
+componente gigante, y el AED aislado desaparece correctamente de los
+resultados, sustituido por AEDs genuinamente alcanzables a un tiempo de
+viaje realista (306-486 s). Documentado en detalle en
+`docs/routing_methodology.md`, sección "Edge Cases and Observed
+Anomalies" — es el argumento más concreto que existe hoy para justificar,
+ante el equipo, un futuro rebuild del grafo que re-snapee los 9 AEDs
+restantes: este riesgo no es hipotético, ya ocurrió, y era invisible hasta
+que se investigó específicamente para construir el arnés de la Fase 5.
+
+**Verificación de golden files — aprobada caso por caso antes de
+regenerar, tal como se pidió:** de los 9 casos, exactamente los 3 con
+`expectation_fase7: expected_change`/`expected_improvement` cambiaron
+(`isolated_flip_c`: 0/0/0 → 3/3/0; `isolated_flip_d`: 0/0/0 → 3/3/0;
+`isolated_partial_e`: 1/0/0 → 2/2/0 — con el AED `aed_5880920245`
+desapareciendo del resultado, ver mecanismo arriba), y exactamente los 6
+con `no_change` se mantuvieron idénticos byte a byte, incluidos los dos
+casos ya marcados como "seguirá vacío incluso tras la Fase 7"
+(`isolated_stays_empty_a`/`b`) y los dos de fallo estructural sin
+relación con el componente gigante (`clausewitz_kaserne`, sin ningún nodo
+a <=100m del punto exacto, ni antes ni después; `water_point`). Ningún
+caso cambió fuera de lo predicho.

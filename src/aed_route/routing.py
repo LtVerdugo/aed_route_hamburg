@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any
 
@@ -18,6 +19,7 @@ from .config import (
 )
 from .nearest import find_candidate_aed_nodes
 
+logger = logging.getLogger(__name__)
 
 _WGS84_TO_PROJECTED = Transformer.from_crs(CRS_MAP, CRS_PROJECTED, always_xy=True)
 
@@ -343,7 +345,24 @@ def find_nearest_aeds(
                 heuristic=heuristic,
                 weight=cost_attr,
             )
-        except (nx.NetworkXNoPath, nx.NodeNotFound):
+        except nx.NetworkXNoPath:
+            # Antes de la Fase 7 (2026-08-14) este descarte era invisible —
+            # sin log, sin métrica, sin forma de distinguir "AED demasiado
+            # lejos" de "candidato en un fragmento del grafo inalcanzable
+            # desde el origen". Ahora queda registrado explícitamente.
+            logger.info(
+                "find_nearest_aeds: candidato descartado, sin ruta "
+                "(mode=%s, origin_node=%s, target_node=%s)",
+                mode, origin_node, target_node,
+            )
+            continue
+        except nx.NodeNotFound:
+            logger.info(
+                "find_nearest_aeds: candidato descartado, nodo no "
+                "encontrado en el subgrafo del modo (mode=%s, "
+                "origin_node=%s, target_node=%s)",
+                mode, origin_node, target_node,
+            )
             continue
 
         total_cost_s = 0.0

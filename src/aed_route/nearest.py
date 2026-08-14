@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
@@ -86,6 +87,56 @@ def build_node_index(nodes_df: pd.DataFrame) -> dict:
         "tree": cKDTree(coords),
         "node_keys": node_keys,
         "coords": coords,
+    }
+
+
+def compute_giant_component_node_keys(G: nx.MultiDiGraph) -> set:
+    """
+    Return the set of node_key values belonging to the largest weakly
+    connected component of G (ignoring edge direction — "weakly" connected
+    is the right notion here since directionality varies per mode: an edge
+    unusable in one direction for car may still be usable for walk/bike).
+
+    Read-only: does not mutate G, does not touch the pickled graph bundle
+    on disk (Restricción Global 1 — the graph is immutable for this
+    remediation effort). Measured against the production graph before
+    writing this (Fase 7, 2026-08-14): ~0.7s for ~658k nodes / ~1.47M
+    edges — negligible next to the graph bundle's own ~5s pickle load.
+
+    This is the SAME notion of "giant component" already used elsewhere
+    in this project's diagnostics (Fase 4's car-mode coverage analysis,
+    Fase 5's golden-file case selection) — computed over the general
+    graph, not restricted to any single transport mode's edges.
+    """
+    components = nx.weakly_connected_components(G)
+    giant = max(components, key=len)
+    return set(giant)
+
+
+def filter_node_index_to_keys(node_index: dict, allowed_keys: set) -> dict:
+    """
+    Return a NEW node_index dict restricted to node_keys present in
+    allowed_keys — does not mutate the input node_index, the graph, or any
+    cached artifact. Rebuilds a fresh cKDTree over just the allowed subset.
+
+    Used (Fase 7, 2026-08-14) to restrict origin snapping
+    (`snap_origin_to_graph`) to nodes within the giant weakly connected
+    component, so a click near a small disconnected fragment snaps to a
+    real, reachable node instead of an isolated one that can never yield a
+    route to any AED — see docs/decisions.md for the full rationale and
+    the golden-file cases this targets.
+    """
+    node_keys = node_index["node_keys"]
+    coords = node_index["coords"]
+    mask = np.fromiter(
+        (nk in allowed_keys for nk in node_keys), dtype=bool, count=len(node_keys)
+    )
+    filtered_keys = node_keys[mask]
+    filtered_coords = coords[mask]
+    return {
+        "tree": cKDTree(filtered_coords),
+        "node_keys": filtered_keys,
+        "coords": filtered_coords,
     }
 
 

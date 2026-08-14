@@ -14,15 +14,22 @@ SRC_ROOT = PROJECT_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from aed_route.utils import setup_logging
-from aed_route.nearest import build_aed_index, build_node_index
+from aed_route.utils import setup_logging, sha256_of_file
+from aed_route.nearest import (
+    build_aed_index,
+    build_node_index,
+    compute_giant_component_node_keys,
+    filter_node_index_to_keys,
+)
 from aed_route.routing import find_nearest_aeds
 from aed_route.graph_builder_osm import load_or_build_graph_bundle
-from aed_route.io import load_or_build_geojson
+from aed_route.io import load_or_build_geojson, read_json, write_json
 from aed_route.isochrones import compute_isochrones
 from aed_route.config import (
     AEDS_CACHE_REL_PATH,
     BOUNDARY_CACHE_REL_PATH,
+    GIANT_COMPONENT_CACHE_REL_PATH,
+    GRAPH_CACHE_REL_PATH,
     ISOCHRONE_CACHE_REL_PATH,
     SHORTLIST_EUCLIDEAN_K,
 )
@@ -59,10 +66,91 @@ bundle, _ = load_or_build_graph_bundle(
     aeds_fc=aeds_fc,
 )
 
-logger.info("Building spatial indices...")
+logger.info("Computing giant weakly connected component...")
+# Fase 7, 2026-08-14 (C3). Read-only over the loaded graph, never touches
+# the pickle. Cached as a NEW derived artifact — not the graph itself —
+# so the ~0.7s computation isn't repeated on every process restart.
+#
+# The cache is tied to the graph pickle's own SHA-256 checksum (~0.7s to
+# compute over the 364 MB file — measured, comparable to the giant
+# component computation itself, so caching no longer saves much wall time
+# in practice; it is kept anyway for the audit trail it leaves in
+# data/processed/, and because it still avoids double work within the
+# hot path when the check is cheap relative to graph rebuilds). The graph
+# is immutable today (Restricción Global 1, enforced additionally by
+# chmod 444 on the pickle — see docs/decisions.md, Fase 0), so this
+# checksum can never actually change during this remediation effort. It
+# exists as a safeguard for later: if the graph is ever rebuilt (e.g. for
+# a future car-mode fix), a stale giant-component cache would otherwise
+# silently reference nodes/edges from a graph that no longer exists,
+# giving wrong-but-plausible-looking snapping decisions with no visible
+# error — this check turns that into a logged, automatic recomputation
+# instead.
 nodes_df = bundle["nodes_df"]
-node_index = build_node_index(nodes_df)
+all_node_keys = set(nodes_df["node_key"].tolist())
+giant_cache_path = PROJECT_ROOT / GIANT_COMPONENT_CACHE_REL_PATH
+graph_pkl_sha256 = sha256_of_file(PROJECT_ROOT / GRAPH_CACHE_REL_PATH)
+
+_cached = read_json(giant_cache_path) if giant_cache_path.exists() else None
+if _cached is not None and _cached.get("graph_pkl_sha256") == graph_pkl_sha256:
+    excluded_node_keys = set(_cached["excluded_node_keys"])
+    giant_node_keys = all_node_keys - excluded_node_keys
+    logger.info(
+        "Giant component loaded from cache: %d nodes, %d excluded (%s)",
+        len(giant_node_keys), len(excluded_node_keys), giant_cache_path,
+    )
+else:
+    if _cached is not None:
+        logger.warning(
+            "Giant component cache at %s is STALE (pickle checksum "
+            "changed from %s to %s) — recomputing instead of trusting a "
+            "cache that could reference a different graph.",
+            giant_cache_path, _cached.get("graph_pkl_sha256"), graph_pkl_sha256,
+        )
+    giant_node_keys = compute_giant_component_node_keys(bundle["graph"])
+    excluded_node_keys = all_node_keys - giant_node_keys
+    write_json(giant_cache_path, {
+        "graph_pkl_sha256": graph_pkl_sha256,
+        "total_nodes": len(all_node_keys),
+        "giant_component_size": len(giant_node_keys),
+        "excluded_node_count": len(excluded_node_keys),
+        # node_key is a mix of ints (road nodes) and strings ("aed_...").
+        # Sorted by str() only for a stable, diffable file — membership
+        # checks after loading compare the original JSON-preserved types.
+        "excluded_node_keys": sorted(excluded_node_keys, key=str),
+    })
+    logger.info(
+        "Giant component computed and cached: %d nodes, %d excluded (%s)",
+        len(giant_node_keys), len(excluded_node_keys), giant_cache_path,
+    )
+
+logger.info("Building spatial indices...")
+node_index_unfiltered = build_node_index(nodes_df)
+# Origin snapping restricted to the giant component (Fase 7, closes the
+# origin-side half of C3): a click near a small disconnected fragment now
+# snaps to a real, reachable node instead of an isolated one that could
+# never yield a route to any AED. See docs/decisions.md for the AED side,
+# which is NOT re-snapped here (accepted technical debt — see below).
+node_index = filter_node_index_to_keys(node_index_unfiltered, giant_node_keys)
 aed_index = build_aed_index(aeds_fc, nodes_df)
+
+aed_nodes_outside_giant = [
+    nk for nk in aed_index["aed_nodes"] if nk not in giant_node_keys
+]
+if aed_nodes_outside_giant:
+    logger.warning(
+        "%d AED node(s) are OUTSIDE the giant weakly connected component "
+        "and are NOT reachable from most origins in ANY transport mode — "
+        "find_nearest_aeds will silently skip them as A* candidates "
+        "(NetworkXNoPath). This is accepted technical debt (Fase 7, "
+        "2026-08-14, see docs/decisions.md): fixing it would require "
+        "re-snapping AED access edges, which means rebuilding the graph "
+        "bundle — out of scope while the graph is treated as immutable. "
+        "Affected AED node_keys: %s",
+        len(aed_nodes_outside_giant), aed_nodes_outside_giant,
+    )
+else:
+    logger.info("All AED nodes are within the giant weakly connected component.")
 
 logger.info("Loading isochrones...")
 isochrones_fc = compute_isochrones(

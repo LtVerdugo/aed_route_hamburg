@@ -116,6 +116,15 @@ Important notes:
   `--timeout`/worker-kill concern to configure — uvicorn does not impose a
   startup timeout on its own worker process the way Gunicorn's default
   configuration can.
+- Startup also computes the graph's giant weakly connected component
+  (Fase 7, 2026-08-14 — used to restrict origin snapping, see
+  `docs/decisions.md`), adding roughly **0.85 seconds** on top of the
+  above: ~0.7s to checksum the 364 MB graph pickle (to detect a stale
+  cache — see `docs/decisions.md`) plus ~0.15s to rebuild the filtered
+  spatial index, whether the giant-component result itself is loaded from
+  cache or computed fresh. Negligible next to the ~5s graph load, included
+  here for completeness since every added startup cost was asked to be
+  tracked explicitly during this remediation.
 
 ### 6. Configure the public URL
 The recommended public URL is:

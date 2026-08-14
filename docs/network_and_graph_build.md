@@ -155,21 +155,44 @@ Integrating AEDs permanently into the graph means:
 - Access edge geometry is drawn as part of the route
 - No special-case logic needed at query time
 
-**Giant component constraint — NOT implemented, known gap (corrected
-2026-08-14):**
+**Giant component constraint — origin side implemented in Fase 7; AED side
+remains known, now-quantified technical debt (updated 2026-08-14):**
 This section previously claimed that AED nodes are snapped only to nodes
-within the giant weakly connected component of the unified graph. Verified
-directly against `add_aed_nodes_to_graph`
-(`src/aed_route/graph_builder_osm.py`): the snapping `cKDTree` is built
+within the giant weakly connected component of the unified graph. That was
+never true of `add_aed_nodes_to_graph`
+(`src/aed_route/graph_builder_osm.py`): its snapping `cKDTree` is built
 over *all* road nodes in `nodes_df`, with no connectivity/component filter
-of any kind — there is no `connected_components` or `weakly_connected`
-check anywhere in this file. An AED whose nearest road node happens to be
-in a small disconnected component is connected to that node anyway, not
-excluded from snapping. Origin-side filtering to the giant component is
-planned for a later remediation phase; the AED side of this gap requires
-rebuilding the graph's AED access edges and is accepted as known technical
-debt for now (the graph is treated as immutable in the current remediation
-effort) — see `docs/decisions.md`.
+of any kind, and this has NOT changed — `graph_builder_osm.py` is
+untouched in Fase 7 (the graph pickle is immutable for this remediation
+effort, enforced by `chmod 444`, see `docs/decisions.md`).
+
+What Fase 7 (2026-08-14) DID change: **origin snapping** (a user's click,
+handled in `app/app.py` + `src/aed_route/nearest.py`, not in graph
+construction) is now restricted to the giant weakly connected component,
+computed once at startup and cached as a derived artifact —
+`data/processed/graph_giant_component_excluded_nodes.json` — never as a
+change to the graph pickle itself. A click near a small disconnected
+fragment now snaps to a real, reachable node instead of an isolated one.
+
+**The AED side is unchanged and now precisely quantified**: of the 139 AED
+nodes present in the graph, **9 are outside the giant weakly connected
+component** (logged as a WARNING with their exact node_keys at every
+app startup). These 9 AEDs cannot be reached from almost any origin, in
+any transport mode, and `find_nearest_aeds` will silently skip them as A*
+candidates. Fixing this requires re-snapping those AEDs' access edges to
+a node within the giant component, which means rebuilding the graph
+bundle — out of scope while the graph is treated as immutable, and
+accepted as known technical debt with this document as its record.
+
+**This "9" is a different metric from the "2 AED nodes skipped" figure
+above (`AED nodes skipped (beyond MAX_SNAP_DISTANCE_M): 2`) — do not
+conflate them.** The 2 skipped AEDs never became graph nodes at all (no
+road node was found within 100 m at graph-build time). The 9 discussed
+here ARE real graph nodes, connected to the network — just to a small,
+disconnected fragment of it, not the main usable network. 141 AEDs in the
+source → 139 become graph nodes (2 skipped) → of those 139, 9 are
+practically unreachable (this section) and 130 are in the giant component
+and reachable normally.
 
 ---
 

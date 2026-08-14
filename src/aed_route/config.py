@@ -57,6 +57,14 @@ BOUNDARY_CACHE_REL_PATH: Final[Path] = PROCESSED_DIR_REL / "hamburg_boundary.geo
 
 GRAPH_CACHE_REL_PATH: Final[Path] = INTERIM_DIR_REL / "hamburg_graph.pkl"
 
+# Artefacto derivado (Fase 7, 2026-08-14) — NUNCA el pickle del grafo en sí.
+# Lista de node_keys fuera del componente débilmente conexo mayor del
+# grafo, calculada al arranque de la app y cacheada aquí para no repetir
+# el cálculo (~0.7s sobre el grafo real) en cada reinicio del proceso.
+GIANT_COMPONENT_CACHE_REL_PATH: Final[Path] = (
+    PROCESSED_DIR_REL / "graph_giant_component_excluded_nodes.json"
+)
+
 
 # =========================================================
 # Isochrones

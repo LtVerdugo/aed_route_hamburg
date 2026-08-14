@@ -559,43 +559,35 @@ Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
 - Modify: `docs/network_and_graph_build.md`, `docs/routing_methodology.md`,
   `docs/decisions.md`
 
-- [ ] **Paso 1:** Al arranque, calcular una vez (solo lectura sobre el grafo
-      cargado, sin mutar nada) el componente débilmente conexo mayor.
-      Cachear el resultado como artefacto derivado nuevo en
-      `data/processed/` — lista de `node_keys` EXCLUIDOS (pequeña, no el
-      grafo completo).
-- [ ] **Paso 2:** Filtrar el `node_index` que usa `snap_origin_to_graph` a
-      nodos del componente gigante (cambio local en `nearest.py`/`app.py`).
-- [ ] **Paso 3:** Detectar al arranque qué nodos `aed_*` quedan fuera del
-      componente gigante — loguear con nivel WARNING listando sus ids (sin
-      re-snapearlos: eso requeriría tocar el pickle inmutable). Registrar en
-      `docs/decisions.md` como deuda aceptada, con el motivo explícito (snap
-      AED horneado en el pickle).
-- [ ] **Paso 4:** Añadir logging en `find_nearest_aeds` cuando un candidato
-      se descarta por `nx.NetworkXNoPath`, para que el descarte deje de ser
-      invisible.
-- [ ] **Paso 5:** Correr los golden files de la Fase 5. **Se espera que
-      algunos cambien** — clicks que hoy devuelven lista vacía por snapear a
-      un fragmento aislado pasarán a devolver ruta. Mostrar uno por uno los
-      casos que cambian, con justificación de cada diff. NO regenerar el
-      baseline sin aprobación caso por caso del usuario.
-- [ ] **Paso 6:** Tras aprobación caso por caso, regenerar solo esos golden
-      files (los que no cambiaron quedan intactos).
-- [ ] **Paso 7:** Actualizar la documentación para que diga la verdad: filtro
-      de componente gigante implementado para el snapping de ORIGEN
-      únicamente; lado AED sigue sin implementarse, deuda conocida y
-      aceptada explícitamente (con referencia a la entrada correspondiente
-      en `docs/decisions.md`).
-- [ ] **Paso 8:** Commit.
-
-  ```bash
-  git add data/processed/nodes_outside_giant_component.json src/aed_route/nearest.py src/aed_route/routing.py app/app.py docs/network_and_graph_build.md docs/routing_methodology.md docs/decisions.md tests/golden/
-  git commit -m "fix: restringir snapping de origen al componente gigante; loguear AEDs y candidatos fuera de él (C3)"
-  ```
-
-- [ ] **Paso 9 — OBLIGATORIO:** `superpowers:requesting-code-review` sobre el
-      diff de este commit antes de presentar la fase como terminada.
-- [ ] **Paso 10:** `verification-before-completion` + smoke test.
+- [x] **Paso 1:** Implementado en `nearest.py` (`compute_giant_component_node_keys`).
+      Cacheado en `data/processed/graph_giant_component_excluded_nodes.json`,
+      atado al SHA-256 del pickle (endurecido más allá del plan original,
+      a petición del usuario, para detectar un rebuild futuro).
+- [x] **Paso 2:** `filter_node_index_to_keys` en `nearest.py`, aplicado en
+      `app.py` al `node_index` que recibe `find_nearest_aeds`.
+- [x] **Paso 3:** 9 AEDs detectados fuera del componente gigante, WARNING
+      con sus node_keys exactos al arranque. Registrado en
+      `docs/decisions.md` como deuda aceptada, cuantificada por primera
+      vez y explícitamente distinguida de la cifra de "2 AEDs omitidos"
+      ya existente.
+- [x] **Paso 4:** Logging (INFO) en `find_nearest_aeds` para
+      `NetworkXNoPath` y `NodeNotFound` por separado. Verificado en vivo:
+      dispara exactamente para `aed_5880920245` en el caso
+      `isolated_partial_e`.
+- [x] **Paso 5:** Golden files corridos y presentados caso por caso ANTES
+      de regenerar — exactamente 3 cambiaron (los `expected_change`/
+      `expected_improvement`), exactamente 6 no cambiaron, ninguno fuera
+      de lo predicho. Aprobados por el usuario.
+- [x] **Paso 6:** Regenerados solo esos 3 + `MANIFEST.json`.
+- [x] **Paso 7:** Documentación actualizada en `network_and_graph_build.md`
+      y `routing_methodology.md` (origen: implementado; AED: deuda
+      cuantificada), más una sección nueva en "Edge Cases and Observed
+      Anomalies" documentando el mecanismo de falso positivo del caso E.
+- [x] **Paso 8:** Commit.
+- [ ] **Paso 9 — OBLIGATORIO:** `superpowers:requesting-code-review`,
+      pendiente de ejecutar tras este commit.
+- [ ] **Paso 10:** `verification-before-completion` + smoke test final,
+      pendiente tras la revisión.
 
 ---
 
