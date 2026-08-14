@@ -1,0 +1,15 @@
+# Cachés de datos pesadas (cientos de MB) — se copian manualmente al
+# servidor, ver README_deploy.md. Se ignora todo data/ EXCEPTO el checksum
+# del grafo inmutable, que sí se versiona (es texto plano, no el pickle).
+data/*
+!data/interim
+data/interim/*
+!data/interim/hamburg_graph.pkl.sha256
+
+# Entorno virtual local
+.venv/
+
+# Artefactos de SO / Python
+.DS_Store
+__pycache__/
+*.pyc

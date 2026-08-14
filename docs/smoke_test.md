@@ -1,0 +1,58 @@
+# Smoke Test Manual — AED Route Hamburg
+
+Ejecutar tras CADA fase del plan de remediación
+(`docs/superpowers/plans/2026-08-14-audit-remediation.md`), antes de dar la
+fase por cerrada (`superpowers:verification-before-completion`). Si
+cualquier paso falla: revertir el commit de la fase en curso y parar.
+
+**Nota (Fase 0):** el puerto de arranque aún no está unificado (hallazgo
+C7 — pendiente de decidirse en la Fase 3b). Hoy conviven 5050 (bloque
+`__main__` de `app/app.py`) y 5000 (`app/wsgi.py`, `Dockerfile`,
+`docker-compose.yml`, `docs/apache.conf`). Usar el puerto real que el
+comando de arranque elegido efectivamente expone, no uno fijo de memoria.
+
+1. **Arrancar el servidor:**
+   ```bash
+   .venv/bin/uvicorn app.app:app --host 0.0.0.0 --port <puerto vigente>
+   ```
+   Confirmar que aparece el log de arranque (`"FastAPI app ready."` — no
+   `"Flask app ready."`, ver hallazgo C4) sin traceback, y que el proceso
+   sigue vivo tras la carga del grafo (~20-30 s).
+
+2. **Health check:**
+   ```bash
+   curl http://127.0.0.1:<puerto>/healthz
+   ```
+   Debe devolver `{"ok":true}`.
+
+3. **Carga de la página raíz:** abrir `http://127.0.0.1:<puerto>/` en un
+   navegador y confirmar visualmente las tres capas:
+   - Puntos de AED (marcadores rojos)
+   - Límite administrativo (polilínea azul)
+   - Isócronas (activar el toggle correspondiente — capas verde/naranja)
+
+   Nota (Fase 0 — hallazgo C1, pendiente de reverificación en Fase 1): la
+   auditoría original afirmaba que `/` sirve `index_original.html`, cuyo
+   frontend hace `fetch("./data/...")` relativo y esas tres capas fallarían
+   con 404. Este paso del smoke test debe registrar explícitamente qué se
+   observa realmente (capas visibles o no), no asumir el resultado.
+
+4. **Ruta por click:** un click en el mapa debe devolver una ruta en cada
+   uno de los tres modos (Walk, Bike, Car) — confirmar que se dibuja una
+   polilínea y que la tarjeta de resultado muestra tiempo y distancia.
+
+5. **Apagado limpio:** parar el servidor (Ctrl+C) y confirmar que no quedan
+   procesos `uvicorn`/`python` huérfanos:
+   ```bash
+   pgrep -fl "uvicorn app.app:app"
+   ```
+   No debe devolver nada tras el apagado.
+
+## Registro de ejecuciones
+
+Cada fase añade aquí una línea al cerrar, con fecha, fase y resultado
+(no se borra el historial — apéndice simple, no formato append-only estricto
+como `docs/decisions.md`):
+
+| Fecha | Fase | Resultado | Notas |
+|---|---|---|---|
