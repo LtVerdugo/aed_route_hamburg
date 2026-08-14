@@ -533,10 +533,15 @@ Cada uno de los tres sub-commits de la Fase 3 cierra con su propio
       completo, incluida la explicación del grado 1 (no "degeneración a
       Dijkstra") y qué lo rompería en el futuro.
 - [x] **Paso 6:** Commit.
-- [ ] **Paso 7 — OBLIGATORIO:** `superpowers:requesting-code-review` sobre
-      el diff, pendiente de ejecutar tras este commit.
-- [ ] **Paso 8:** `verification-before-completion` + smoke test final,
-      pendiente tras la revisión.
+- [x] **Paso 7 — OBLIGATORIO:** `superpowers:requesting-code-review`
+      ejecutada. 4 hallazgos "Important" — todos reverificados
+      independientemente y corregidos (margen de admisibilidad del 1%,
+      caché de velocidad de coche keyed por id(G), fallo ruidoso en vez de
+      default silencioso, test nuevo para `_car_max_speed_m_s`). Detalle
+      completo en `docs/decisions.md`.
+- [x] **Paso 8:** `verification-before-completion` + smoke test final.
+      7/7 tests en verde, golden files sin cambios tras las correcciones
+      de la revisión, `GET /` 200, sin procesos huérfanos.
 
 ---
 

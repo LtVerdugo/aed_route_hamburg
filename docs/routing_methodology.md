@@ -440,12 +440,33 @@ from the loaded graph's edges** rather than assumed, and cached at the
 module level to avoid rescanning ~646,000 edges per request.
 
 **Measured effect:** after the fix, A* explores visibly fewer nodes for
-the same query — e.g. 2,560 → 255 nodes for a representative walk query
-in the city centre (≈90% fewer), 43,229 → 9,008 for a query near the
-administrative boundary (≈79% fewer). This is the first time this
+the same query — e.g. 2,560 → 259 nodes for a representative walk query
+in the city centre (≈90% fewer), 43,229 → 9,377 for a query near the
+administrative boundary (≈78% fewer). This is the first time this
 project's A* has actually benefited from heuristic guidance rather than
 behaving close to plain Dijkstra — the "60-80% fewer nodes than Dijkstra"
 claim below was aspirational before this fix, not measured.
+
+**Correction after code review (2026-08-14, same day — see
+`docs/decisions.md` for the full review):** the first version of this fix
+claimed unqualified admissibility ("h(n) never overestimates the true
+cost"), which an independent code review found to be very slightly false
+in practice, and which was then independently reproduced: the straight-
+line distance computed from EPSG:25832-projected coordinates can exceed
+the `length_m` OSMnx recorded for the same edge (computed geodetically on
+the WGS84 ellipsoid), because the UTM-based projection has a scale
+distortion that is not exactly 1 away from its central meridian. Measured
+directly against the loaded graph (20,000 sampled edges, plus the edges
+around the Neuwerk exclave specifically, as the area furthest from the
+projection's central meridian): the projected straight-line distance
+exceeds the recorded `length_m` on effectively 100% of edges, by a mean of
+~0.18% and a measured maximum of ~0.298%. `heuristic()` now applies a 1%
+safety margin (`_ADMISSIBILITY_SAFETY_MARGIN` in `routing.py`, more than
+3× the measured worst case) to restore a real, not just nominal,
+admissibility guarantee. This margin barely blunts the heuristic's
+guidance (node counts above already include it) and does not change any
+route selection (golden files unchanged both before and after adding the
+margin).
 
 A* is preferred over plain Dijkstra because an admissible heuristic
 prioritises nodes in the direction of the destination, typically exploring

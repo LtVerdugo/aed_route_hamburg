@@ -572,3 +572,73 @@ reproyectar nodos) se respetó en todo momento.
   ver la opción (iv) del modo car), y las cifras de esta entrada.
 - `requesting-code-review` pendiente de ejecutarse sobre el diff antes de
   cerrar la fase (obligatoria para Fases 6 y 7, acordado previamente).
+
+---
+
+## 2026-08-14 — Fase 6: revisión de código obligatoria — 4 hallazgos "Important" verificados y corregidos
+
+Revisor independiente (subagente `general-purpose`, plantilla
+`requesting-code-review`) sobre el diff `cbf4bd5..08842a7`. El revisor
+cargó el pickle real de producción y verificó de forma independiente cada
+cifra empírica del código/documentación (rangos de coordenadas, velocidades
+por modo, grado de los AEDs, golden files) — todas se confirmaron
+correctas. Hallazgos "Important", cada uno reverificado por mí antes de
+actuar (no aplicados a ciegas):
+
+1. **Admisibilidad no estrictamente cierta — CONFIRMADO independientemente
+   y corregido.** El revisor encontró violaciones reales de h(n) <= h*(n)
+   (125/74.816 pares en walk, 128/515.370 en bike) por una causa concreta:
+   la distancia en línea recta calculada en coordenadas proyectadas
+   EPSG:25832 puede superar el `length_m` que OSMnx calculó para esa misma
+   arista (geodésico sobre WGS84) por la distorsión de escala de la
+   proyección UTM. Reverificado por mí de forma independiente: 20.000
+   aristas de muestra (100% con distancia proyectada > length_m, media
+   0,177%, máximo 0,298%) y las 2.022 aristas del exclave de Neuwerk
+   específicamente (máximo similar, 0,293% — no empeora lejos del
+   meridiano central tanto como cabría esperar). **Corregido**: nuevo
+   `_ADMISSIBILITY_SAFETY_MARGIN = 0.99` en `routing.py` (margen del 1%,
+   >3x el peor caso medido), aplicado a la distancia antes de dividir por
+   la velocidad. Verificado que no cambia ningún golden file ni la
+   conclusión de las mediciones de nodos explorados (259/491/9.377 en vez
+   de 255/485/9.008 — sigue siendo una reducción masiva frente a los
+   2.560/2.722/43.229 de antes del fix).
+2. **`_car_max_speed_cache` era una variable global sin keying — CONFIRMADO
+   y corregido.** A diferencia de `_coord_lookup_cache` (keyed por
+   `id(nodes_df)`), la caché de velocidad máxima de coche era una única
+   variable compartida — si algún día se cargara más de un bundle en el
+   mismo proceso, la segunda llamada reutilizaría en silencio la velocidad
+   del PRIMER grafo. No se manifiesta hoy (un solo bundle por proceso),
+   pero es un bug latente real, no cosmético. **Corregido**: cache ahora
+   keyed por `id(G)`, igual que `_coord_lookup_cache`.
+3. **`coord_lookup.get(u, (0.0, 0.0))` — fallo silencioso — CONFIRMADO y
+   corregido.** Si un nodo faltara alguna vez en `nodes_df` (regresión
+   futura en la construcción del grafo), la heurística degradaría en
+   silencio a un punto en el origen de coordenadas (fuera de Hamburgo) en
+   vez de fallar — exactamente el patrón que hizo posible el bug original
+   de esta fase. **Corregido**: ahora lanza `KeyError` explícito con
+   contexto si un nodo no está en el lookup, en vez de usar un valor por
+   defecto silencioso.
+4. **Sin test para la lógica de `_car_max_speed_m_s`** — sin cobertura
+   automatizada (solo verificación manual contra el pickle real). Único
+   entre las tres velocidades por ser lógica nueva no reducible a una
+   constante conocida. **Corregido**: `tests/test_car_max_speed.py`
+   (5 tests) cubre velocidades heterogéneas, aristas no drivables que no
+   deben contaminar el máximo, aristas con `length_m`/`drive_cost_s`
+   nulos o cero, el camino `ValueError` cuando no hay ninguna arista
+   drivable válida, y que la caché por `id(G)` no mezcla dos grafos
+   distintos en el mismo proceso.
+
+**No corregido en esta fase, registrado como recomendación para más
+adelante:** el revisor sugirió también conectar `scripts/
+generate_golden_routes.py` a un test de pytest real (hoy la comparación de
+golden files es manual, no forzada por CI) — no implementado aquí por ser
+un cambio de infraestructura de test más amplio, no una corrección puntual
+del fix; queda como recomendación abierta, no como deuda aceptada con
+plazo.
+
+Los otros hallazgos ("Minor") no se actuaron por ser de bajo impacto según
+la propia calibración del revisor (comentario sobre condición de carrera
+benigna en el warm-up de caché; cifras empíricas embebidas en docstrings
+que podrían quedar desactualizadas si el grafo se reconstruyera; asimetría
+de manejo de errores entre el `ValueError` de car y el resto de
+`find_nearest_aeds`).

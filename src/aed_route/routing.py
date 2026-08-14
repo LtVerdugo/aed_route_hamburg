@@ -52,11 +52,30 @@ _MAX_SPEED_M_S: dict[str, float] = {
     "bike": BIKE_SPEED_M_S,
 }
 
-# Cachés a nivel de módulo. El grafo se carga una sola vez al arranque de
-# la app y no cambia durante su vida (Restricción Global 1: el grafo es
-# inmutable), así que calcular esto una vez es válido y evita trabajo
-# repetido caro en cada petición.
-_car_max_speed_cache: float | None = None
+# Margen de seguridad sobre la admisibilidad, añadido tras la revisión de
+# código de la Fase 6 (2026-08-14, ver docs/decisions.md). Verificado
+# empíricamente contra el grafo real: la distancia en línea recta calculada
+# en coordenadas proyectadas EPSG:25832 puede superar levemente el
+# `length_m` que OSMnx calculó para esa misma arista (geodésico sobre el
+# elipsoide WGS84) — la proyección UTM introduce una distorsión de escala
+# que no es exactamente 1. Medido sobre 20.000 aristas de muestra (y de
+# nuevo sobre las 2.022 aristas del exclave de Neuwerk, la zona más alejada
+# del meridiano central): sobreestimación máxima real ~0,298%. Sin este
+# margen, h(n) podría superar h*(n) por ese margen en casos límite,
+# violando admisibilidad estricta. Con este factor (1% de margen, más de 3
+# veces el peor caso medido), h(n) queda garantizada por debajo del coste
+# real incluso con esa distorsión.
+_ADMISSIBILITY_SAFETY_MARGIN = 0.99
+
+# Cachés a nivel de módulo, keyed por id(G)/id(nodes_df). El grafo se carga
+# una sola vez al arranque de la app y no cambia durante su vida
+# (Restricción Global 1: el grafo es inmutable), así que calcular esto una
+# vez por bundle es válido y evita trabajo repetido caro en cada petición.
+# Se cachea por id() (no de forma incondicional) para que, si alguna vez
+# se cargara más de un bundle en el mismo proceso (p. ej. en tests), cada
+# uno obtenga su propio valor en vez de reutilizar el de otro grafo — un
+# bug real señalado en la revisión de código, no solo cosmético.
+_car_max_speed_cache: dict[int, float] = {}
 _coord_lookup_cache: dict[int, dict] = {}
 
 
@@ -66,13 +85,14 @@ def _car_max_speed_m_s(G: nx.MultiDiGraph) -> float:
     cargado (max(length_m / drive_cost_s)). Medida una vez sobre el pickle
     real antes de escribir este fix: min=2.778 m/s, max=33.333 m/s (120
     km/h) sobre 645.996 aristas — el máximo se repite en muchas aristas
-    (categoría de vía real, no un valor atípico de datos). Cacheada porque
-    recorrer ~646.000 aristas en cada petición de modo "car" sería
+    (categoría de vía real, no un valor atípico de datos). Cacheada por
+    id(G): recorrer ~646.000 aristas en cada petición de modo "car" sería
     demasiado caro para hacerlo por consulta.
     """
-    global _car_max_speed_cache
-    if _car_max_speed_cache is not None:
-        return _car_max_speed_cache
+    key = id(G)
+    cached = _car_max_speed_cache.get(key)
+    if cached is not None:
+        return cached
 
     max_speed = 0.0
     for _u, _v, _k, data in G.edges(keys=True, data=True):
@@ -93,7 +113,7 @@ def _car_max_speed_m_s(G: nx.MultiDiGraph) -> float:
             "con length_m y drive_cost_s positivos?)."
         )
 
-    _car_max_speed_cache = max_speed
+    _car_max_speed_cache[key] = max_speed
     return max_speed
 
 
@@ -130,7 +150,6 @@ def _coord_lookup(nodes_df: pd.DataFrame) -> dict:
             zip(nodes_df["x"].values, nodes_df["y"].values),
         )
     )
-    _coord_lookup_cache.clear()  # solo interesa el nodes_df vigente
     _coord_lookup_cache[key] = lookup
     return lookup
 
@@ -272,14 +291,30 @@ def find_nearest_aeds(
 
     def heuristic(u: str, v: str) -> float:
         # Coordenadas leídas de nodes_df (vía coord_lookup), NUNCA de
-        # G.nodes[...] — ver _coord_lookup(). Distancia dividida por la
-        # velocidad MÁXIMA del modo (no la media) para que la heurística
-        # quede en la misma unidad que el peso de A* (segundos) sin perder
-        # admisibilidad — ver _MAX_SPEED_M_S arriba.
-        ux, uy = coord_lookup.get(u, (0.0, 0.0))
-        vx, vy = coord_lookup.get(v, (0.0, 0.0))
+        # G.nodes[...] — ver _coord_lookup(). Fallo ruidoso (no un default
+        # silencioso a (0,0)) si un nodo del grafo no está en nodes_df: ya
+        # se verificó que hoy esa cobertura es del 100% (Fase 6), así que
+        # un "miss" aquí solo puede significar una regresión futura real —
+        # degradar en silencio a un punto fuera de Hamburgo (0,0) es
+        # exactamente el patrón que hizo posible el bug original de esta
+        # fase, según señaló la revisión de código.
+        try:
+            ux, uy = coord_lookup[u]
+            vx, vy = coord_lookup[v]
+        except KeyError as exc:
+            raise KeyError(
+                f"Nodo {exc} ausente en nodes_df — la heurística no puede "
+                "calcular su distancia. Esto no debería ocurrir (Fase 6 "
+                "verificó cobertura del 100%); si ocurre, es una regresión "
+                "real en la construcción del grafo o de nodes_df, no un "
+                "caso a ignorar en silencio."
+            ) from exc
         distance_m = math.hypot(vx - ux, vy - uy)
-        return distance_m / max_speed_m_s
+        # Velocidad MÁXIMA del modo (no la media) + margen de seguridad de
+        # admisibilidad (ver _ADMISSIBILITY_SAFETY_MARGIN arriba) para que
+        # la heurística quede en la misma unidad que el peso de A*
+        # (segundos) sin superar nunca el coste real mínimo.
+        return (distance_m * _ADMISSIBILITY_SAFETY_MARGIN) / max_speed_m_s
 
     results = []
 
