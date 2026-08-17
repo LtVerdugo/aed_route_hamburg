@@ -11,21 +11,21 @@ directory contains the browser UI, but routing, AED data, boundaries, and
 isochrones are served by **FastAPI** (via `uvicorn`) through `/api/...`.
 Uploading only `static/` will render the page without a working backend.
 
-Note on `static/`: it contains two frontend variants. `index_original.html`
-+ `app_original.js` is the live one, served at `GET /` (see `app/app.py`) and
-connected to the API described in this document. `index.html` + `app.js` is
-an older, unlinked static prototype (no backend calls, hardcoded demo data,
-Hamburg-Mitte-only GeoJSON under `static/data/`) — it is not served at any
-route and is only reachable by navigating directly to `/static/index.html`.
-Its disposition (keep as-is, archive, or remove) is a pending decision, not
-yet made.
+Note on `static/` (updated 2026-08-17, Ítem 8A(3)): it used to contain a
+second, unlinked static prototype (`index.html` + `app.js` + `styles.css`,
+Hamburg-Mitte-only, hardcoded demo data under `static/data/`). That
+prototype has been retired — `static/` now contains only the live
+frontend: `index_original.html` + `app_original.js` + `styles_original.css`,
+served at `GET /` (see `app/app.py`) and connected to the API described in
+this document.
 
 ### 1. Copy the project
 Transfer the project folder to the server. The final structure should look like this:
 
 aed_route_hamburg/
 ├── app/
-│   └── app.py
+│   ├── app.py
+│   └── wsgi.py
 ├── data/
 │   ├── interim/
 │   │   └── hamburg_graph.pkl        ← 364 MB, must be present
@@ -37,11 +37,10 @@ aed_route_hamburg/
 ├── src/
 │   └── aed_route/
 ├── static/
-│   ├── app.js
-│   ├── index.html
-│   └── styles.css
-├── requirements.txt
-└── wsgi.py
+│   ├── app_original.js
+│   ├── index_original.html
+│   └── styles_original.css
+└── requirements.txt
 
 ### 2. Create and activate a virtual environment
 python -m venv .venv
@@ -135,8 +134,12 @@ Do not publish the app as `/demos/aed-routing/static/`. The `static/`
 folder is an implementation detail; users should land on the FastAPI index
 route (`GET /`, `app/app.py`).
 
-If nginx strips the public prefix before forwarding to uvicorn, no extra
-environment variable is needed:
+This deployment requires the reverse proxy to strip the public prefix
+before forwarding to uvicorn — `app/app.py` instantiates `FastAPI()` with
+no `root_path` and no `X-Forwarded-*` middleware (verified by reading
+`app/app.py`; every route is registered at its bare path: `/`, `/api/aeds`,
+`/healthz`, etc., never at `/demos/aed-routing/...`). No extra environment
+variable is needed for this mode:
 
 ```nginx
 location /demos/aed-routing/ {
@@ -147,27 +150,21 @@ location /demos/aed-routing/ {
 }
 ```
 
-If the reverse proxy forwards the prefix through unchanged, start uvicorn
-with `PUBLIC_BASE_PATH` (note, added 2026-08-14: `PUBLIC_BASE_PATH` is not
-actually read anywhere in this repo's code — verified by grep against
-`app/` and `src/`. This whole paragraph describes a configuration mode that
-does not exist today; not fixed further in this pass, flagged for later
-triage):
-
-```bash
-uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
-```
-
-Example nginx config for that mode:
-
-```nginx
-location /demos/aed-routing/ {
-    proxy_pass http://127.0.0.1:5000;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-}
-```
+**Forwarding the prefix through unchanged is NOT supported today.**
+A previous revision of this document described a `PUBLIC_BASE_PATH`
+environment variable for that scenario; confirmed by grep against `app/`
+and `src/` that no such variable is read anywhere in this repo's code —
+it never did anything. Diagnosed 2026-08-14 (see `docs/decisions.md`): if
+the real proxy does not strip `/demos/aed-routing/` before forwarding,
+every route — including the root page — returns 404 from the backend
+**before any HTML is ever served**; there is no working nginx
+configuration for this mode with the code as it stands today. Supporting
+it would require adding `root_path` and/or `X-Forwarded-*` middleware to
+the `FastAPI()` instance in `app/app.py` — a code change, out of scope
+for this remediation. Confirm with whoever manages the real HCU reverse
+proxy that it strips the prefix (the config above) before deploying —
+this has **not** been verified against the actual production proxy
+configuration.
 
 ### 7. Access and verify the app
 Once the server is ready you will see this log line:

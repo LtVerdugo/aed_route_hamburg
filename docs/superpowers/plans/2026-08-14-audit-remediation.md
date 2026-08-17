@@ -640,10 +640,19 @@ el siguiente en la misma respuesta.
       en UI, pendiente 8B); sin duplicar instrucciones de despliegue.
       Pendiente del usuario, no del agente: avisar al equipo de que la
       URL con `/static/` dejó de funcionar (ver `docs/decisions.md`).
-- [ ] **8A(5):** Corregir `README_deploy.md`: documentar el escenario
+- [x] **8A(5):** Corregir `README_deploy.md`: documentar el escenario
       `PUBLIC_BASE_PATH` como NO soportado (404 antes de servir el HTML,
       ya diagnosticado en Fase 4); eliminar o corregir los dos bloques
       nginx duplicados con contenido idéntico. No requiere code review.
+      Además, corregidos (verificables sin suponer nada del servidor de
+      HCU): párrafo desactualizado de "dos variantes de frontend" y árbol
+      de archivos (fallout de 8A(3) + `wsgi.py` preexistente, mal
+      ubicado). Encontrados pero NO corregidos, a la espera de decisión
+      explícita (cambian una recomendación de comportamiento, no solo un
+      dato): `--reload` en el comando de arranque de producción
+      (inconsistente con el `Dockerfile` propio); "Python 3.10 or
+      higher" sin verificar contra ninguna restricción formal. Ver
+      `docs/decisions.md`.
 - [ ] **8A(6):** Commitear el script de benchmark usado en el Ítem 8A(2)
       para medir el coste K=3 vs K=5 (`/tmp/timing_k3_k5.py` en la sesión
       original, no versionado). Nace de un hallazgo Minor de

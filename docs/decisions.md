@@ -1079,3 +1079,72 @@ avisar a su equipo de que la URL `.../demos/aed-routing/static/` dejó de
 funcionar, por si está enlazada desde la web institucional o algún
 material publicado. Este agente no tiene forma de verificar enlaces
 externos al repositorio.
+
+## 2026-08-17 — Ítem 8A(5): `README_deploy.md` corregido — cierra: parte del riesgo de despliegue explícito registrado en la entrada del 2026-08-14 sobre `PUBLIC_BASE_PATH`
+
+Corregido, verificable directamente contra el repositorio, sin suponer
+nada sobre el servidor real de HCU:
+
+1. **`PUBLIC_BASE_PATH` marcado explícitamente como NO soportado.**
+   Sustituida la instrucción rota (mandaba "arrancar uvicorn con
+   `PUBLIC_BASE_PATH`" mostrando un comando que ni siquiera fijaba esa
+   variable, porque el código nunca la lee — ya diagnosticado el
+   2026-08-14) por una explicación directa: si el proxy real no retira el
+   prefijo `/demos/aed-routing/` antes de reenviar, TODAS las rutas —
+   incluida la raíz — devuelven 404 del backend antes de servir ningún
+   HTML, porque `FastAPI()` se instancia sin `root_path` ni middleware de
+   `X-Forwarded-*` (verificado leyendo `app/app.py`, no ha cambiado desde
+   el diagnóstico de Fase 4). Soportarlo exigiría un cambio de código
+   (`root_path`/middleware), fuera de alcance de esta remediación.
+2. **Los dos bloques nginx casi-duplicados, consolidados en uno solo** —
+   el del modo que sí funciona (proxy retira el prefijo). Se eliminó el
+   segundo bloque, asociado al modo ahora marcado como no soportado.
+3. **Párrafo sobre "dos variantes de frontend" en `static/`, corregido**
+   — quedó desactualizado por el propio Ítem 8A(3) (el prototipo huérfano
+   ya no existe). Ahora describe correctamente una sola variante viva.
+4. **Árbol de archivos de la sección "Copy the project", corregido en dos
+   puntos** verificables por `find` sobre el repo real: (a) listaba
+   `static/app.js`/`index.html`/`styles.css` (retirados en 8A(3)) en vez
+   de `static/app_original.js`/`index_original.html`/`styles_original.css`;
+   (b) listaba `wsgi.py` en la raíz del proyecto cuando en realidad vive
+   en `app/wsgi.py` — este segundo error no tiene relación con 8A(3), es
+   una inexactitud preexistente detectada al revisar el árbol completo.
+
+**Pedido explícitamente por el usuario: revisar si quedaba alguna otra
+afirmación sobre el despliegue sin verificar, listando sin corregir las
+que exigirían suponer algo sobre el servidor real de HCU.** Resultado de
+esa revisión completa del documento:
+
+- **No se encontró ninguna afirmación NUEVA que requiera esa suposición.**
+  Las dos únicas que sí la requieren (el puerto 5000 vs. 5050, y si el
+  proxy real retira el prefijo) ya estaban honestamente marcadas como "no
+  verificado contra la configuración real" desde fases anteriores (Fase
+  3b y este mismo ítem) — no hacía falta añadir nada.
+- **Dos hallazgos SÍ verificables sin suponer nada de HCU, pero que
+  cambian una recomendación de comportamiento en vez de solo corregir un
+  dato — no implementados aquí, a la espera de decisión explícita:**
+  - El comando de arranque recomendado en el paso 5
+    (`uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload`) incluye
+    `--reload`, una opción de uvicorn documentada como solo para
+    desarrollo (vigila el sistema de archivos y reinicia el proceso en
+    cada cambio). Esto es inconsistente con el propio `Dockerfile` del
+    repo, cuyo `CMD` arranca uvicorn SIN `--reload`, y con la precaución
+    recién añadida en `docs/smoke_test.md` (Ítem 8A(2)) que asume
+    explícitamente un servidor sin `--reload`. Nunca se había discutido
+    ni verificado en ninguna fase anterior (`grep -- "--reload"` en todo
+    el repo antes de esta revisión solo encontraba las dos apariciones en
+    este mismo documento). No se ha corregido porque cambia el
+    procedimiento de despliegue recomendado, no solo un dato — decisión
+    a tomar explícitamente, no asumida por este agente.
+  - "Python 3.10 or higher" (Prerequisites) no está verificado contra
+    ninguna restricción formal del proyecto (no hay `pyproject.toml` ni
+    `setup.cfg` con `requires-python`); el `.venv` usado durante toda
+    esta remediación corre Python 3.13.13 sin problema, lo cual no
+    contradice la afirmación pero tampoco la confirma como mínimo real.
+    Prioridad baja, mencionado por completitud de la revisión pedida.
+
+Verificado tras las correcciones: `git diff README_deploy.md` revisado
+línea por línea; ninguna sección de las ya verificadas en fases
+anteriores (nota de puerto, notas de arranque, coste de startup, verificación
+de caches) fue tocada. No requiere `requesting-code-review` (solo
+documentación, sin cambios de código).
