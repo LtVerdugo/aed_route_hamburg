@@ -632,8 +632,14 @@ el siguiente en la misma respuesta.
       (200), `/static/app_original.js` y `/static/styles_original.css`
       siguen accesibles (200) vía el mismo mount `/static`, las 3 capas
       responden 200, y los 6 archivos borrados dan 404 real.
-- [ ] **8A(4):** Reemplazar `README.md` por un aviso corto que remita a
+- [x] **8A(4):** Reemplazar `README.md` por un aviso corto que remita a
       `README_deploy.md`. No requiere code review.
+      Describe el producto real (Hamburg completa, con backend); URL
+      pública sin `/static/`; una línea dejando constancia de que
+      `.../static/` ya no sirve la app; modo car matizado (deshabilitado
+      en UI, pendiente 8B); sin duplicar instrucciones de despliegue.
+      Pendiente del usuario, no del agente: avisar al equipo de que la
+      URL con `/static/` dejó de funcionar (ver `docs/decisions.md`).
 - [ ] **8A(5):** Corregir `README_deploy.md`: documentar el escenario
       `PUBLIC_BASE_PATH` como NO soportado (404 antes de servir el HTML,
       ya diagnosticado en Fase 4); eliminar o corregir los dos bloques

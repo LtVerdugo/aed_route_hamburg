@@ -1054,3 +1054,28 @@ un set en vez de una exploración completa de A*. Requiere diseño propio
 (qué componente por modo, cómo cachearlo, coste de mantenerlo
 sincronizado con el filtrado ya existente) — no se evalúa ni se implementa
 en este ítem.
+
+## 2026-08-17 — Ítem 8A(4): `README.md` reemplazado por un aviso corto — cierra: C1 (parte doc), C9
+
+Implementado lo aprobado en la Fase 4(b) (ver entrada de 2026-08-14 más
+arriba). Contenido anterior de `README.md` (describía el prototipo
+estático de Hamburg-Mitte, ya retirado en el Ítem 8A(3)) sustituido por
+un aviso corto que:
+
+- describe el producto real (Hamburg completa, con backend, city-wide);
+- dice explícitamente que la app se sirve en la raíz de la ruta pública
+  (`.../demos/aed-routing/`), **no** bajo `/static/`;
+- deja constancia de que `.../demos/aed-routing/static/` dejó de servir
+  la app (404) al retirarse el prototipo en 8A(3) — para quien la tenga
+  enlazada;
+- no afirma nada sin matizar sobre el modo car: dice que está
+  deshabilitado en la UI a la espera de una decisión de equipo (Fase 8B);
+- remite a `README_deploy.md` para instalación/despliegue, sin duplicar
+  sus instrucciones.
+
+**Pendiente, explícitamente del usuario y no de este agente (reafirma lo
+ya anotado en la entrada de Fase 4(b) de arriba, sigue sin verificarse):**
+avisar a su equipo de que la URL `.../demos/aed-routing/static/` dejó de
+funcionar, por si está enlazada desde la web institucional o algún
+material publicado. Este agente no tiene forma de verificar enlaces
+externos al repositorio.
