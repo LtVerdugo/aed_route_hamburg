@@ -315,6 +315,13 @@ Pendiente, explícitamente del usuario y no de este agente: confirmar con
 su equipo si alguien tiene enlazada la URL `/static/index.html` desde
 fuera de este repositorio antes de borrar los archivos.
 
+**[CORREGIDO 2026-08-17 — premisa equivocada, ver la entrada de esa fecha
+"Corrección: qué hay realmente publicado..." más abajo]:** este párrafo
+asumía que borrar archivos de ESTE repositorio podía afectar a una URL
+pública real. Es falso: lo publicado en producción es una carpeta
+subida a mano, no derivada de este repositorio en absoluto. El borrado
+de la Fase 8A(3) no tuvo ni pudo tener ningún efecto sobre esa URL.
+
 ## 2026-08-14 — Fase 4(c): mitigación del fallo silencioso en resultados vacíos, aprobada — pasa a ser el PRIMER ítem de la Fase 8 — cierra: hallazgo nuevo de UX (registrado 2026-08-14, ver entrada de smoke test)
 
 Aprobadas ambas partes, a implementar juntas en la Fase 8 como primer paso
@@ -1080,6 +1087,14 @@ funcionar, por si está enlazada desde la web institucional o algún
 material publicado. Este agente no tiene forma de verificar enlaces
 externos al repositorio.
 
+**[CORREGIDO 2026-08-17 — ver la entrada de esa fecha "Corrección: qué
+hay realmente publicado..." más abajo]:** esta afirmación es incorrecta.
+Esa URL NO ha dejado de funcionar — sigue sirviendo, sin verse afectada
+por nada de este trabajo. El texto de `README.md` que decía "it now
+returns 404" también se ha corregido. No hay nada que avisar hoy; el
+aviso real (o una redirección) hará falta el día que se despliegue la
+versión con backend, si es que llega a desplegarse.
+
 ## 2026-08-17 — Ítem 8A(5): `README_deploy.md` corregido — cierra: parte del riesgo de despliegue explícito registrado en la entrada del 2026-08-14 sobre `PUBLIC_BASE_PATH`
 
 Corregido, verificable directamente contra el repositorio, sin suponer
@@ -1190,3 +1205,116 @@ sección "Important notes" del propio documento ya exige por separado
 cumplirlo, solo dejar de contradecirlo con `--reload`.
 
 No requiere `requesting-code-review` (solo documentación).
+
+## 2026-08-17 — Corrección del usuario: qué hay realmente publicado en `.../demos/aed-routing/static/`, y que ninguna corrección de las Fases 0-8A está en producción
+
+**Corrección aportada por el usuario, no descubierta por este agente.**
+Dos afirmaciones de este log y de `README.md` eran incorrectas por una
+premisa equivocada: que la URL pública real derivaba de este
+repositorio. No es así.
+
+**(a) Qué hay publicado hoy en `https://www.cml.hcu-hamburg.de/demos/aed-routing/static/`:**
+una carpeta `static/` subida A MANO, con solo los archivos necesarios
+para un prototipo estático de Hamburg-Mitte con GeoJSON precomputados y
+sin backend. **No es este repositorio** — ni el `static/` de este repo
+antes de la Fase 8A(3), ni después. Sigue funcionando hoy exactamente
+igual que siempre, sin verse afectada por nada de este trabajo,
+incluido el borrado del prototipo huérfano en 8A(3) (`static/index.html`
++ `app.js` + `styles.css` + 3 geojson **de este repositorio**, un
+conjunto de archivos distinto y sin relación con lo que hay subido en el
+servidor real).
+
+Corregidas las dos afirmaciones falsas resultantes de esa premisa:
+- El "pendiente" registrado en la entrada de Fase 4(b) (2026-08-14) y
+  reafirmado en la entrada del Ítem 8A(4) (2026-08-17) — "avisar de que
+  la URL dejó de funcionar" — **no aplica hoy**. Marcado con un puntero
+  a esta entrada en ambos sitios, sin borrar el texto original (este log
+  es de solo-adición).
+- `README.md` decía "it now returns 404" sobre esa URL — falso, corregido
+  directamente en el archivo (ver commit de esta misma fecha). La URL
+  seguirá funcionando hasta que, si alguna vez ocurre, se despliegue la
+  versión con backend — momento en el que sí hará falta avisar al equipo
+  o mantener una redirección. Hasta entonces no hay nada roto ni nada
+  que comunicar.
+
+**(b) Ninguna corrección de las Fases 0-8A está en producción — señalado
+explícitamente porque es fácil perderlo de vista tras 30 commits de
+trabajo:** todo este trabajo se ha hecho sobre código que nunca se ha
+desplegado en ningún sitio. En particular:
+- el bug de la heurística A* subóptima (Fase 6, corregido en `routing.py`),
+- el fallo silencioso y el resto de correcciones del modo `car` (Fase 4,
+  8A(1)),
+- el filtro de snapping al componente conexo gigante (Fase 7),
+- y el cambio de `SHORTLIST_EUCLIDEAN_K` (Ítem 8A(2)),
+
+todos afectan exclusivamente a la aplicación con backend de este
+repositorio, que hoy no corre en ningún servidor accesible al público.
+Lo que la gente ve hoy en producción (el prototipo estático de
+Hamburg-Mitte descrito en (a)) no tiene heurística A*, no tiene modo
+car con fallo silencioso tal como lo describe este log, y no tiene
+componente gigante que filtrar — es un artefacto distinto, generado por
+otro proceso (`build_hamburg_mitte.py`, ni siquiera incluido en este
+repo), no afectado por ninguna de estas 8 fases. Ver también la entrada
+siguiente sobre la limitación estructural de infraestructura, que
+explica por qué esto es así y probablemente seguirá siéndolo sin una
+decisión de arquitectura explícita.
+
+## 2026-08-17 — Limitación estructural del usuario: el servidor de HCU solo aloja archivos estáticos — la app con backend NO es desplegable en la infraestructura actual
+
+**Aportado por el usuario, por encima en importancia de cualquier
+corrección de las Fases 0-8A.** El servidor real de HCU
+(`www.cml.hcu-hamburg.de`) solo tiene capacidad para alojar archivos
+estáticos — no hay posibilidad de mantener un proceso Python
+persistente. La aplicación con backend de este repositorio (FastAPI +
+uvicorn + 364 MB de grafo cargados en memoria) **no es desplegable hoy
+en esa infraestructura**, independientemente de lo correcto que sea el
+código tras esta remediación.
+
+`README_deploy.md` describe un procedimiento (Pasos 1-7) que asume un
+proceso persistente arrancable por línea de comandos, con puerto propio
+y proxy inverso delante — un modelo de despliegue que la infraestructura
+actual no soporta en absoluto. Se ha añadido una nota al inicio de ese
+documento para que nadie lo siga contra el servidor real (ver commit de
+esta misma fecha).
+
+**Desplegar esta versión no es "subir la carpeta nueva" como se hizo con
+el prototipo estático** — es un despliegue de naturaleza distinta:
+proceso persistente en segundo plano (no una petición-respuesta stateless
+de servidor de archivos), proxy inverso para exponerlo bajo la ruta
+pública, gestión de puerto, `--workers 1` obligatorio (el grafo de 364 MB
+en memoria no es seguro de compartir entre procesos), y un arranque de
+5-30s (según si el grafo se carga de caché o se reconstruye) que un
+servidor de archivos estático no necesita gestionar en absoluto. Requiere
+un tipo de infraestructura que hoy no existe para este proyecto, no una
+variación del mecanismo de subida ya usado.
+
+**Las tres verificaciones contra el servidor real de HCU registradas en
+fases anteriores quedan reclasificadas de PENDIENTES a EN SUSPENSO** —
+no tiene sentido verificarlas hasta que exista infraestructura capaz de
+ejecutar la app:
+1. Si el proxy real escucha/reenvía al puerto 5000 y no 5050 (Fase 3b).
+2. Si el modo de proxy configurado retira el prefijo público antes de
+   reenviar, o lo reenvía sin tocar — el escenario `PUBLIC_BASE_PATH`,
+   ya marcado como no soportado por el código (Ítem 8A(5)).
+3. Que ningún mecanismo real de arranque (systemd, supervisor, o
+   cualquier otro que se use el día de un despliegue real) reintroduzca
+   `--reload` u otra configuración de desarrollo (Ítem 8A(7)) — este
+   repositorio ya no lo recomienda en ningún sitio, pero verificarlo
+   contra el proceso REAL que arranque la app solo tiene sentido cuando
+   ese proceso exista.
+
+Las tres seguirán en suspenso hasta que haya una decisión de
+infraestructura.
+
+**Pregunta de arquitectura que esto abre, planteada aquí sin analizarla
+— corresponde decidirla al usuario y su equipo, no a este agente:**
+¿se consigue infraestructura distinta capaz de correr un proceso Python
+persistente (VM, contenedor con orquestador, servicio gestionado), o se
+adapta el enfoque de esta aplicación para precomputar resultados a
+estático, como ya hace el prototipo de Hamburg-Mitte actualmente
+desplegado? Esta segunda vía tendría implicaciones directas sobre qué
+partes del trabajo de las Fases 0-8A siguen siendo aplicables (la
+corrección de la heurística A* y el filtro de componente gigante son
+relevantes en cualquier caso, para precomputar mejor; el modo car y el
+snapping dependen de cómo se precompute). No evaluado aquí — es la
+decisión previa de la que depende todo lo demás.

@@ -635,11 +635,12 @@ el siguiente en la misma respuesta.
 - [x] **8A(4):** Reemplazar `README.md` por un aviso corto que remita a
       `README_deploy.md`. No requiere code review.
       Describe el producto real (Hamburg completa, con backend); URL
-      pública sin `/static/`; una línea dejando constancia de que
-      `.../static/` ya no sirve la app; modo car matizado (deshabilitado
-      en UI, pendiente 8B); sin duplicar instrucciones de despliegue.
-      Pendiente del usuario, no del agente: avisar al equipo de que la
-      URL con `/static/` dejó de funcionar (ver `docs/decisions.md`).
+      pública sin `/static/`; modo car matizado (deshabilitado en UI,
+      pendiente 8B); sin duplicar instrucciones de despliegue.
+      **[CORREGIDO 2026-08-17, ver `docs/decisions.md`]:** la afirmación
+      original de este ítem ("`.../static/` ya no sirve la app") era
+      incorrecta — esa URL no es este repositorio, sigue funcionando, y
+      no hacía falta avisar a nadie. `README.md` corregido en consecuencia.
 - [x] **8A(5):** Corregir `README_deploy.md`: documentar el escenario
       `PUBLIC_BASE_PATH` como NO soportado (404 antes de servir el HTML,
       ya diagnosticado en Fase 4); eliminar o corregir los dos bloques
@@ -693,3 +694,16 @@ integrar `remediation/audit-2026-08` (merge a `main`, mantener aparte,
 etc.). No asumir la respuesta. (Corrección registrada explícitamente por
 el usuario, 2026-08-14: las fases cerradas hasta ahora son 0-7, no 0-8 —
 no invocar esa skill todavía.)
+
+**Limitación estructural registrada 2026-08-17 (ver `docs/decisions.md`),
+relevante para esta conversación de integración cuando llegue:** el
+servidor real de HCU solo aloja archivos estáticos — no hay
+infraestructura capaz de ejecutar la app con backend de este
+repositorio hoy. Ninguna corrección de las Fases 0-8A está en
+producción; lo que hay publicado en `.../demos/aed-routing/static/` es
+un prototipo estático distinto, subido a mano, no relacionado con este
+repo y no afectado por este trabajo. La pregunta de arquitectura
+(conseguir infraestructura nueva vs. precomputar a estático) queda
+abierta, sin analizar, pendiente de decisión del usuario y su equipo —
+antes de eso, "integrar la rama" no tiene un destino de despliegue
+esperando al otro lado.

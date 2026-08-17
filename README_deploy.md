@@ -1,5 +1,29 @@
 # Deployment Guide — AED Route Hamburg
 
+> **⚠️ Not executable against the current HCU server (noted 2026-08-17).**
+> The real server at `www.cml.hcu-hamburg.de` only hosts static files —
+> there is no capability for a persistent Python process today. This
+> guide's Steps 1-7 assume exactly that (a long-running `uvicorn` process,
+> a reverse-proxy route, a port to manage, a 5-30s startup loading a
+> 364 MB graph into memory) — none of which the current infrastructure
+> supports. **Do not attempt to follow this guide against that server —
+> it cannot work, regardless of how correct the steps are.**
+>
+> Deploying this app is **not** the same operation as uploading the
+> static prototype currently live at
+> `.../demos/aed-routing/static/` (a hand-uploaded folder, unrelated to
+> this repository — see `docs/decisions.md`, 2026-08-17). It is a
+> different *kind* of deployment — a persistent background process
+> behind a reverse proxy, not a stateless file server — and requires
+> infrastructure that does not exist for this project yet.
+>
+> This is an open architecture question, not resolved here: either
+> obtain infrastructure that can run a persistent process (a VM, a
+> container platform, a managed service), or adapt this app's approach
+> to precompute results to static output, the way the current prototype
+> already does. See `docs/decisions.md` for the full note; nothing below
+> this point should be attempted until that decision is made.
+
 ## Prerequisites
 - Python 3.10 or higher
 - pip
@@ -100,7 +124,10 @@ reason. It also contradicted this repo's own `Dockerfile`, whose `CMD`
 never included it. Removed; the command above now matches `Dockerfile`'s
 `CMD` exactly (same host/port, no `--reload`, no explicit `--workers` —
 uvicorn defaults to 1 worker, which is also the hard requirement noted
-below).
+below). **Verifying this against whatever real process manager eventually
+launches the app in production is currently EN SUSPENSO, not pending —
+see the top-of-file note and `docs/decisions.md` (2026-08-17): there is
+no such process today.**
 
 **Port note (resolved 2026-08-14):** the canonical port across this repo is
 now **5000** — unified in `app/app.py`, `app/wsgi.py`, `Dockerfile`,
@@ -112,8 +139,11 @@ against the actual reverse proxy configuration running on the HCU server.**
 `docs/apache.conf` is a snippet kept in this repo, not proof of what is
 actually configured in production. If the real deployed proxy points to
 5050, this change will make the service unreachable until that proxy
-config is updated to match. Verify the live proxy configuration before the
-next deployment — see `docs/decisions.md`.
+config is updated to match. **Verifying the live proxy configuration is
+currently EN SUSPENSO, not pending — see the top-of-file note and
+`docs/decisions.md` (2026-08-17): there is no infrastructure today
+capable of running this app at all, so there is nothing yet to point a
+real proxy at.**
 
 Important notes:
 - --workers must be 1. The graph bundle (364 MB) is loaded into memory once at startup and is not safe to share across multiple worker processes.
@@ -173,10 +203,11 @@ every route — including the root page — returns 404 from the backend
 configuration for this mode with the code as it stands today. Supporting
 it would require adding `root_path` and/or `X-Forwarded-*` middleware to
 the `FastAPI()` instance in `app/app.py` — a code change, out of scope
-for this remediation. Confirm with whoever manages the real HCU reverse
-proxy that it strips the prefix (the config above) before deploying —
-this has **not** been verified against the actual production proxy
-configuration.
+for this remediation. **Confirming this with whoever manages the real HCU
+reverse proxy is currently EN SUSPENSO, not pending — see the top-of-file
+note and `docs/decisions.md` (2026-08-17): there is no reverse proxy
+routing to this app in production today, because there is no
+infrastructure capable of running it at all.**
 
 ### 7. Access and verify the app
 Once the server is ready you will see this log line:
