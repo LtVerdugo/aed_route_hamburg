@@ -1318,3 +1318,54 @@ corrección de la heurística A* y el filtro de componente gigante son
 relevantes en cualquier caso, para precomputar mejor; el modo car y el
 snapping dependen de cómo se precompute). No evaluado aquí — es la
 decisión previa de la que depende todo lo demás.
+
+## 2026-08-17 — El repositorio local NO comparte historia de git con `origin/main` — decisión consciente de NO reescribir el historial antes de publicar
+
+Verificado tras `git remote add origin` + `git fetch origin` (2026-08-17,
+solo lectura, sin pull/merge/rebase/reset): `git merge-base HEAD
+origin/main` no encuentra ningún ancestro común (exit code 1). El commit
+baseline de este repositorio local (`860b5d7`, rama `main`, ver entrada
+de más arriba sobre el prefijo `chore:`) no desciende de ningún commit
+del histórico real de `origin/main` en GitHub (12 commits, desde
+`2313c44 "Initial commit"` hasta `ac94b9c "chore: add original static
+files and demo response data"`, HEAD remoto actual). Es decir: este
+repositorio local se inicializó como una historia de git nueva y
+separada en algún momento anterior a esta remediación (antes del commit
+baseline), no como un clon de GitHub — un hecho estructural preexistente,
+no introducido por este trabajo.
+
+**El contenido, en cambio, es casi idéntico:** comparado el árbol de
+`main` local contra `origin/main` (`git diff --stat`, no historia, solo
+contenido), la diferencia son 29 archivos, todos preexistentes y sin
+relación con la remediación — 17 archivos bajo `scratch/` y
+`src/aed_route/indoor.py`, presentes en el repositorio local pero
+ausentes en `origin/main`, más una diferencia menor de 16 líneas en
+`src/aed_route/config.py` ya presente antes de la Fase 0. Ninguno de
+estos 29 archivos fue tocado por ninguna fase de esta remediación.
+
+**Consecuencia práctica, registrada para cuando se abra un PR:** al no
+compartir historia, GitHub no podrá calcular un merge limpio entre
+`remediation/audit-2026-08` y `origin/main` — mostrará "unrelated
+histories" y es probable que el diff del PR incluya como "añadidos" esos
+29 archivos preexistentes, ruido ajeno al trabajo real de las Fases 0-8A.
+Con 90.288 inserciones ya en el diff real de la remediación, esta señal
+adicional es marginal — el diff completo no es el mecanismo de revisión
+previsto de todos modos; la revisión real se apoya en
+`docs/decisions.md` (este archivo) y en el plan
+(`docs/superpowers/plans/2026-08-14-audit-remediation.md`), no en leer
+línea a línea un diff de ese tamaño.
+
+**Decisión explícita del usuario: NO reescribir el historial de git
+para reconciliarlo con `origin/main` antes de publicar.** Reescribirlo
+significaría rehacer los 30 commits de esta rama (autoría, mensajes,
+fechas relativas al historial real) sobre una base distinta, con riesgo
+de invalidar el trabajo ya verificado (cada commit de esta rama fue
+revisado y su `git log -1 --format=full` confirmado en su momento) a
+cambio de un beneficio que hoy no aporta nada — el trabajo no es
+desplegable de todos modos (ver entrada anterior sobre la
+infraestructura de HCU) y no hay prisa de fusión. Publicar la rama ahora
+resuelve lo urgente (el trabajo existe solo en este portátil) sin ese
+riesgo; el problema de historia no compartida es una cuestión de
+legibilidad de revisión a resolver más adelante, si acaso, no un
+bloqueante técnico del push (`git push` crea una referencia nueva, no
+toca `origin/main`).
