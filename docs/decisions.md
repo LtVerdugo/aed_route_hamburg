@@ -1148,3 +1148,23 @@ línea por línea; ninguna sección de las ya verificadas en fases
 anteriores (nota de puerto, notas de arranque, coste de startup, verificación
 de caches) fue tocada. No requiere `requesting-code-review` (solo
 documentación, sin cambios de código).
+
+## 2026-08-17 — Ítem 8A(6): script de benchmark K=3 vs K=5, commiteado — cierra: Minor de requesting-code-review sobre 8A(2)
+
+`scripts/benchmark_shortlist_k.py`, nuevo. Reconstruye el benchmark ad hoc
+usado en el Ítem 8A(2) (entonces solo en `/tmp`, no reproducible) como un
+script versionado, con la misma metodología: llama DIRECTAMENTE a
+`find_nearest_aeds` (no vía HTTP) pasando `k` explícito, precisamente para
+que el resultado nunca dependa de `SHORTLIST_EUCLIDEAN_K` en `config.py` ni
+de si un servidor vivo llegó a cargar esa constante — evita a propósito el
+falso negativo de proceso documentado en la entrada de 8A(2) de más arriba.
+Reutiliza los 9 orígenes de `scripts/generate_golden_routes.py` (import
+directo de `CASES`, no una copia).
+
+**Verificado reproduciendo las cifras del Ítem 8A(2)** con
+`.venv/bin/python3 scripts/benchmark_shortlist_k.py --repeat 2`:
+walk K3=565.7ms→K5=586.4ms (+3.7%), bike K3=571.8ms→K5=1154.8ms (+102.0%),
+car K3=1638.6ms→K5=2719.7ms (+66.0%) — coinciden con el orden de magnitud
+registrado entonces (+4.7%/+101.5%/+65.5%); la pequeña variación entre
+ejecuciones es ruido normal de medición de tiempo real (wall-clock), no un
+cambio de comportamiento.

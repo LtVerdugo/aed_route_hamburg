@@ -653,7 +653,7 @@ el siguiente en la misma respuesta.
       (inconsistente con el `Dockerfile` propio); "Python 3.10 or
       higher" sin verificar contra ninguna restricción formal. Ver
       `docs/decisions.md`.
-- [ ] **8A(6):** Commitear el script de benchmark usado en el Ítem 8A(2)
+- [x] **8A(6):** Commitear el script de benchmark usado en el Ítem 8A(2)
       para medir el coste K=3 vs K=5 (`/tmp/timing_k3_k5.py` en la sesión
       original, no versionado). Nace de un hallazgo Minor de
       `requesting-code-review` sobre 8A(2): las cifras de latencia que
@@ -662,6 +662,18 @@ el siguiente en la misma respuesta.
       experimento a mano. Ubicación sugerida: `scripts/`, junto a
       `generate_golden_routes.py`. No requiere code review (solo
       tooling de medición, no toca comportamiento de producción).
+      `scripts/benchmark_shortlist_k.py` creado; verificado reproduciendo
+      las cifras de 8A(2) (mismo orden de magnitud, ver
+      `docs/decisions.md`).
+- [ ] **8A(7):** Quitar `--reload` del comando de arranque recomendado en
+      `README_deploy.md`. Nace del hallazgo (a) registrado en 8A(5): es
+      un flag de desarrollo (reinicia el proceso al detectar cambios en
+      archivos; con un grafo de 364 MB, un reinicio espurio deja el
+      servicio caído decenas de segundos) y contradice al `Dockerfile`
+      propio, que ya arranca sin él. Verificar que el comando resultante
+      es coherente con el `Dockerfile` y con el `--workers 1` que el
+      propio documento ya exige. No requiere code review (solo
+      documentación).
 
 **Fase 8B — bloqueada, a la espera del equipo del usuario:**
 - [ ] Modo car: implementar la opción (iv) (snap dependiente del modo,
