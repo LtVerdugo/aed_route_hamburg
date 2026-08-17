@@ -620,16 +620,33 @@ el siguiente en la misma respuesta.
       de candidatos euclídeo-cercanos pero inalcanzables (ver
       `docs/decisions.md`). `requesting-code-review` ejecutada — sin
       hallazgos Critical/Important.
-- [ ] **8A(3):** Retirar `static/index.html`, `app.js`, `styles.css` y los
+- [x] **8A(3):** Retirar `static/index.html`, `app.js`, `styles.css` y los
       3 `hamburg_mitte_*.geojson`. Grep en todo el árbol (incluido
       `scratch/`) antes de borrar, confirmando que nada más los
       referencia. No requiere code review (solo borrado).
+      Grep confirmó cero referencias reales fuera del propio trío
+      huérfano (`app_original.js`/`index_original.html`/
+      `styles_original.css` no los mencionan); las únicas menciones
+      externas eran prosa en `README*.md`/`docs/*.md`. Verificado en vivo
+      tras el borrado: `GET /` sigue sirviendo `index_original.html`
+      (200), `/static/app_original.js` y `/static/styles_original.css`
+      siguen accesibles (200) vía el mismo mount `/static`, las 3 capas
+      responden 200, y los 6 archivos borrados dan 404 real.
 - [ ] **8A(4):** Reemplazar `README.md` por un aviso corto que remita a
       `README_deploy.md`. No requiere code review.
 - [ ] **8A(5):** Corregir `README_deploy.md`: documentar el escenario
       `PUBLIC_BASE_PATH` como NO soportado (404 antes de servir el HTML,
       ya diagnosticado en Fase 4); eliminar o corregir los dos bloques
       nginx duplicados con contenido idéntico. No requiere code review.
+- [ ] **8A(6):** Commitear el script de benchmark usado en el Ítem 8A(2)
+      para medir el coste K=3 vs K=5 (`/tmp/timing_k3_k5.py` en la sesión
+      original, no versionado). Nace de un hallazgo Minor de
+      `requesting-code-review` sobre 8A(2): las cifras de latencia que
+      sustentan el hallazgo abierto de candidatos inalcanzables
+      (`docs/decisions.md`) no son reproducibles sin repetir el
+      experimento a mano. Ubicación sugerida: `scripts/`, junto a
+      `generate_golden_routes.py`. No requiere code review (solo
+      tooling de medición, no toca comportamiento de producción).
 
 **Fase 8B — bloqueada, a la espera del equipo del usuario:**
 - [ ] Modo car: implementar la opción (iv) (snap dependiente del modo,
