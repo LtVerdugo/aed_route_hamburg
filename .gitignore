@@ -14,3 +14,9 @@ data/interim/*
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Config local del harness de Claude Code (permisos de comandos por
+# checkout/máquina, auto-generada por la herramienta) -- no es politica de
+# proyecto. .claude/settings.json SI se trackea (esa es politica de
+# proyecto: includeCoAuthoredBy=false, Regla Global 3).
+.claude/settings.local.json
