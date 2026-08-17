@@ -88,7 +88,19 @@ only the AED cache is guaranteed to fail fast if you forget one.
 Run this command from the project root (this project runs on **uvicorn**,
 not Gunicorn — there is no Gunicorn config anywhere in this repo):
 
-uvicorn app.app:app --host 0.0.0.0 --port 5000 --reload
+uvicorn app.app:app --host 0.0.0.0 --port 5000
+
+**`--reload` note (resolved 2026-08-17):** this command previously included
+`--reload`, a uvicorn flag meant for development — it restarts the whole
+process whenever it detects a file change under the project directory.
+With the 364 MB graph bundle taking real time to reload from disk, a
+spurious restart (e.g. from a log file or a docs edit touching the watched
+tree) leaves the service down for that long, in production, for no
+reason. It also contradicted this repo's own `Dockerfile`, whose `CMD`
+never included it. Removed; the command above now matches `Dockerfile`'s
+`CMD` exactly (same host/port, no `--reload`, no explicit `--workers` —
+uvicorn defaults to 1 worker, which is also the hard requirement noted
+below).
 
 **Port note (resolved 2026-08-14):** the canonical port across this repo is
 now **5000** — unified in `app/app.py`, `app/wsgi.py`, `Dockerfile`,

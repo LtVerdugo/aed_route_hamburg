@@ -665,7 +665,7 @@ el siguiente en la misma respuesta.
       `scripts/benchmark_shortlist_k.py` creado; verificado reproduciendo
       las cifras de 8A(2) (mismo orden de magnitud, ver
       `docs/decisions.md`).
-- [ ] **8A(7):** Quitar `--reload` del comando de arranque recomendado en
+- [x] **8A(7):** Quitar `--reload` del comando de arranque recomendado en
       `README_deploy.md`. Nace del hallazgo (a) registrado en 8A(5): es
       un flag de desarrollo (reinicia el proceso al detectar cambios en
       archivos; con un grafo de 364 MB, un reinicio espurio deja el
@@ -674,6 +674,10 @@ el siguiente en la misma respuesta.
       es coherente con el `Dockerfile` y con el `--workers 1` que el
       propio documento ya exige. No requiere code review (solo
       documentación).
+      Verificado: el comando resultante es idéntico al `CMD` del
+      `Dockerfile` (mismo host/puerto, sin `--workers` explícito en
+      ninguno de los dos — ambos dependen del valor por defecto de
+      uvicorn, que es 1, cumpliendo el requisito ya documentado).
 
 **Fase 8B — bloqueada, a la espera del equipo del usuario:**
 - [ ] Modo car: implementar la opción (iv) (snap dependiente del modo,

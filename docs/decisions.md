@@ -1168,3 +1168,25 @@ car K3=1638.6ms→K5=2719.7ms (+66.0%) — coinciden con el orden de magnitud
 registrado entonces (+4.7%/+101.5%/+65.5%); la pequeña variación entre
 ejecuciones es ruido normal de medición de tiempo real (wall-clock), no un
 cambio de comportamiento.
+
+## 2026-08-17 — Ítem 8A(7): `--reload` retirado del comando de arranque recomendado en `README_deploy.md` — cierra: hallazgo (a) registrado en 8A(5)
+
+Quitado `--reload` del único comando de arranque de producción que lo
+tenía (Paso 5). Motivo, ya registrado en 8A(5): es un flag de desarrollo
+de uvicorn (reinicia el proceso entero al detectar cualquier cambio de
+archivo bajo el árbol vigilado); con el grafo de 364 MB, un reinicio
+espurio (p. ej. por un log, o por un edit de docs dentro del árbol
+vigilado) deja el servicio caído ese tiempo, en producción, sin motivo.
+Contradecía además al `Dockerfile` propio, cuyo `CMD` nunca lo incluyó.
+
+**Verificado tras el cambio:** el comando resultante
+(`uvicorn app.app:app --host 0.0.0.0 --port 5000`) es ahora **idéntico**
+(mismo host, mismo puerto) al `CMD` del `Dockerfile`
+(`["uvicorn", "app.app:app", "--host", "0.0.0.0", "--port", "5000"]`).
+Ninguno de los dos fija `--workers` explícitamente — ambos dependen del
+valor por defecto de uvicorn (1), que es exactamente el requisito que la
+sección "Important notes" del propio documento ya exige por separado
+("--workers must be 1"); no hacía falta añadir el flag explícito para
+cumplirlo, solo dejar de contradecirlo con `--reload`.
+
+No requiere `requesting-code-review` (solo documentación).
