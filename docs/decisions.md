@@ -945,3 +945,112 @@ resultados"; los tres casos legítimos de agua/fuera de
 `MAX_SNAP_DISTANCE_M`/fuera del componente gigante siguen devolviendo
 `results: []` sin cambios; el HTML servido incluye `aria-disabled`,
 `tabindex="-1"` y el nuevo `#request-error`.
+
+## 2026-08-14 — Ítem 8A(2): `SHORTLIST_EUCLIDEAN_K` = 5, implementado — cierra: C6
+
+Implementado lo aprobado teóricamente en la Fase 4(a) (ver entrada de
+arriba). `config.py`: `SHORTLIST_EUCLIDEAN_K` de 3 a 5.
+
+**Validación empírica que la decisión no tenía hasta ahora — deja de ser
+una justificación teórica.** Regenerados los 9 casos golden con K=5 real
+(tras resolver un falso negativo de proceso, ver nota de más abajo) y
+comparados caso por caso contra los golden K=3 committeados:
+
+- **`isolated_flip_c`, modo walk: cambia el rank 1.** Con K=3 el mejor
+  resultado era el AED `3325525940` (1606.2 s). Con K=5, el AED
+  `3024050425` — que con K=3 nunca se evaluaba, por no estar entre los 3
+  euclídeo-más-cercanos desde ese origen — entra en la shortlist y resulta
+  **90.2 s más rápido a pie** (1516.0 s). Es la prueba de que el prefiltro
+  euclídeo con K=3 podía (y en este caso concreto lo hacía) devolver una
+  ruta subóptima como "mejor ruta", porque cercanía en línea recta no
+  implica cercanía en red. Este es el hecho concreto que faltaba: la
+  Fase 4(a) justificaba K=5 citando `docs/routing_methodology.md`, pero
+  sin una demostración de un caso real afectado.
+- Ningún otro origen cambia de rank 1.
+- 5 de los 9 orígenes ganan alternativas (los que ya tenían resultado);
+  19 rutas-alternativa adicionales en total repartidas en walk/bike
+  (dense_urban, boundary_edge, isolated_flip_c: +2/+2; isolated_flip_d:
+  +2 walk / +1 bike; isolated_partial_e: +2/+2). Car sigue en 0 en todos
+  los casos — no relacionado con K, es el fallo estructural C_car
+  (Fase 8B, sin resolver).
+- Ningún origen que hoy tenía resultados pasa a tener menos.
+
+**Coste medido** (no invocado, medido directamente sobre
+`find_nearest_aeds` con los 9 orígenes, 2 repeticiones): en el caso
+típico (orígenes con buena conectividad en el modo evaluado) el coste
+extra de K=5 es de ~15–150 ms, barato. En orígenes con conectividad
+parcial por modo, el coste puede dispararse a varios segundos por cada
+candidato euclídeo-cercano-pero-inalcanzable — ver hallazgo abierto
+inmediatamente debajo, registrado aparte porque es un problema
+preexistente que K=5 solo multiplica, no algo introducido por este
+cambio.
+
+**Corrección de doc, verificada no asumida:**
+`docs/routing_methodology.md` afirmaba "Compare routes toggle showing up
+to 4 alternative routes" como si fuera una garantía. Con K=5 el máximo
+teórico es 4 alternativas (rank 2-5), pero solo si las 5 búsquedas A*
+tienen éxito — verificado que esto NO siempre ocurre
+(`isolated_flip_d`/bike se queda en 3 alternativas porque un candidato es
+descartado por `NetworkXNoPath`). Corregida la frase para reflejar la
+condicionalidad real.
+
+**Nota de proceso — falso negativo por servidor con config en memoria:**
+la primera medición tras editar `config.py` dio resultados idénticos a
+K=3 y cero descartes registrados, una combinación internamente
+inconsistente. Causa: el proceso uvicorn usado había arrancado 97 s ANTES
+del cambio en `config.py` (confirmado con `ps -o lstart`, no con la
+primera línea del log de arranque, que es engañosa — ver precaución
+añadida en `docs/smoke_test.md`). Proceso reiniciado, medición repetida
+correctamente. Ver `docs/smoke_test.md` para el procedimiento a seguir en
+el futuro.
+
+`tests/golden/*.json` y `MANIFEST.json` regenerados con K=5 real y
+committeados junto con el cambio de `config.py`.
+
+## 2026-08-14 — Ítem 8A(2): hallazgo abierto — latencia de candidatos euclídeo-cercanos pero inalcanzables (NO implementado)
+
+**No se implementa en esta fase — queda abierto para decidir con el
+equipo si va junto a la Fase 8B (modo car) o después.**
+
+Al medir el coste de K=5 (ver entrada de arriba) se observó que, cuando
+uno de los K candidatos euclídeo-más-cercanos a un origen resulta
+inalcanzable en el modo consultado, el coste de descartarlo por
+`NetworkXNoPath` no es barato: A* debe explorar buena parte (o la
+totalidad) del componente conexo alcanzable antes de poder concluir que
+no existe camino. Medido directamente sobre `find_nearest_aeds`:
+
+- `isolated_flip_d`, modo bike: 25 ms (K=3, los 3 candidatos son
+  alcanzables) → **5.1 s** (K=5, el 5º candidato euclídeo,
+  `aed_4160068089`, no es alcanzable en bici desde ese origen).
+- `isolated_flip_d`, modo car: 7.4 s (K=3, los 3 candidatos ya fallan,
+  ~2.5 s cada uno) → **12.4 s** (K=5, 5 candidatos fallan).
+
+Esto es **preexistente** — ya ocurría con K=3, es inherente a tener un
+grafo con componentes desconectados por modo y usar `NetworkXNoPath`
+como señal de descarte — pero K=5 lo expone en más combinaciones
+origen/modo al evaluar 2 candidatos euclídeos más por consulta, cada uno
+con su propio riesgo de ser una búsqueda fallida cara.
+
+**Por qué importa más de lo que parece:** `app/app.py` arranca uvicorn
+sin especificar `--workers` (por tanto 1 worker); aunque `POST
+/api/route` usa `asyncio.to_thread` (Fase 3a), eso mueve el trabajo a un
+hilo del threadpool, no lo paraleliza de verdad frente a otras peticiones
+que compitan por el mismo threadpool. Con `--workers 1`, varios segundos
+de exploración A* fallida en una petición pueden degradar la latencia
+percibida por otros usuarios concurrentes, no solo por quien hizo la
+consulta cara.
+
+**Línea de solución probable a evaluar más adelante (no implementada
+aquí):** comprobar la pertenencia al componente conexo del modo ANTES de
+lanzar A* hacia un candidato, en vez de descubrir la inalcanzabilidad
+mediante una búsqueda completa que falla. Ya existe la maquinaria de
+componente gigante de la Fase 7
+(`compute_giant_component_node_keys`/`filter_node_index_to_keys` en
+`nearest.py`) para el lado del origen; para car, la Fase 4 ya midió los
+componentes del subgrafo drivable. Si el candidato y el origen no
+comparten componente conexo en el modo consultado, la inalcanzabilidad es
+segura por definición, y descartarlo cuesta una consulta de pertenencia a
+un set en vez de una exploración completa de A*. Requiere diseño propio
+(qué componente por modo, cómo cachearlo, coste de mantenerlo
+sincronizado con el filtrado ya existente) — no se evalúa ni se implementa
+en este ítem.

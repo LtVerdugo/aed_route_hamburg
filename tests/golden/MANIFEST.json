@@ -10,7 +10,7 @@
     "isolated_flip_d",
     "isolated_partial_e"
   ],
-  "generated_with_commit": "a2d354355811957f085edc373a11a94c63330473",
+  "generated_with_commit": "f126fd0d2ea5e92758c4c9e9c3766df3e73bcb73",
   "generator_script": "scripts/generate_golden_routes.py",
   "note": "generated_with_commit registra el commit vigente en la ÚLTIMA regeneración de este baseline, no necesariamente un estado 'antes de cualquier fix' — el baseline original (previo a las Fases 6/7/8) se generó con el commit adf2f53; desde entonces se ha regenerado tras cambios que sí debían alterar algunos casos (ver docs/decisions.md, Fases 6 y 7, para el historial de qué cambió y por qué). No editar los .json de tests/golden/ a mano — regenerar con este script y revisar el diff explícitamente, caso por caso, antes de aceptar cualquier cambio."
 }

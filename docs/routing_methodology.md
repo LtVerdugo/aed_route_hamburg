@@ -699,7 +699,9 @@ remove) is a pending product decision, not yet made.
   - Best route card (green) with time, distance and
     AED metadata
   - Compare routes toggle showing up to 4 alternative
-    routes with time penalty labels (+Xm Ys longer)
+    routes (fewer if some of the K=5 Euclidean-nearest
+    candidates are unreachable by the current mode) with
+    time penalty labels (+Xm Ys longer)
 - Routes drawn as polylines:
   - Best route: solid green, weight 5
   - Alternatives: dashed grey, weight 3

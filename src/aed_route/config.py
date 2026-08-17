@@ -15,7 +15,7 @@ CRS_PROJECTED: Final[str] = "EPSG:25832"  # Metric calculations in Hamburg
 WALK_SPEED_M_S: Final[float] = 1.7  # We need to back this up with research papers
 BIKE_SPEED_M_S: Final[float] = 4.5  # We need to back this up with research papers
 
-SHORTLIST_EUCLIDEAN_K: Final[int] = 3
+SHORTLIST_EUCLIDEAN_K: Final[int] = 5
 MAX_SNAP_DISTANCE_M: Final[float] = 100.0
 
 TRANSPORT_PROFILES: Final[tuple[str, ...]] = ("walk", "bike", "car")

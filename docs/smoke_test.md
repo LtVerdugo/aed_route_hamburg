@@ -19,6 +19,28 @@ producción; ver `docs/decisions.md`.
    `"Flask app ready."`, ver hallazgo C4) sin traceback, y que el proceso
    sigue vivo tras la carga del grafo (~20-30 s).
 
+   **Precaución permanente (Ítem 8A(2), 2026-08-14) — config en memoria sin
+   `--reload`:** el servidor no se arranca con `--reload`, así que
+   `app/app.py` importa `src/aed_route/config.py` UNA sola vez, al inicio
+   del proceso. Editar `config.py` con el servidor ya corriendo NO tiene
+   ningún efecto hasta reiniciar el proceso — el servidor sigue sirviendo
+   con los valores viejos indefinidamente, sin ningún error ni aviso.
+   **Antes de medir o comparar comportamiento tras cambiar `config.py`,
+   verificar SIEMPRE que el proceso arrancó DESPUÉS del cambio** con:
+   ```bash
+   ps -o pid,lstart -p <PID del proceso uvicorn>
+   ```
+   y comparar contra el mtime real del archivo (`stat -f "%Sm" config.py`
+   en macOS). **No usar la primera línea del log de arranque del servidor
+   como proxy de la hora de arranque real** — esa línea aparece varios
+   segundos después del inicio del proceso (tras cargar AEDs, grafo, etc.),
+   y puede dar la falsa impresión de que el proceso nació después de un
+   cambio que en realidad ya estaba corriendo desde antes. Este modo de
+   fallo produce mediciones con apariencia de válidas (números concretos,
+   servidor respondiendo con normalidad) que en realidad reflejan la
+   configuración anterior — no un error visible, un silencio engañoso.
+   Ocurrió una vez durante el Ítem 8A(2); ver `docs/decisions.md`.
+
 2. **Health check:**
    ```bash
    curl http://127.0.0.1:<puerto>/healthz
