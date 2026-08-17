@@ -609,11 +609,17 @@ el siguiente en la misma respuesta.
       marcado como borrador pendiente de aprobación del equipo.
       `requesting-code-review` obligatoria ejecutada — 5 hallazgos
       Important corregidos (ver `docs/decisions.md`).
-- [ ] **8A(2):** `SHORTLIST_EUCLIDEAN_K` = 5 en `config.py` + corrección de
+- [x] **8A(2):** `SHORTLIST_EUCLIDEAN_K` = 5 en `config.py` + corrección de
       "hasta 4 alternativas" en la doc. Golden files SÍ cambiarán —
       mostrar diff caso por caso antes de commitear, confirmar
       explícitamente si cambia algún rank 1 (no solo alternativas).
       `requesting-code-review` obligatoria (toca comportamiento).
+      Rank 1 cambia en `isolated_flip_c`/walk (90.2s más rápido);
+      5/9 orígenes ganan 19 alternativas en total; ningún origen pierde
+      resultados. Hallazgo abierto registrado (no implementado): coste
+      de candidatos euclídeo-cercanos pero inalcanzables (ver
+      `docs/decisions.md`). `requesting-code-review` ejecutada — sin
+      hallazgos Critical/Important.
 - [ ] **8A(3):** Retirar `static/index.html`, `app.js`, `styles.css` y los
       3 `hamburg_mitte_*.geojson`. Grep en todo el árbol (incluido
       `scratch/`) antes de borrar, confirmando que nada más los
