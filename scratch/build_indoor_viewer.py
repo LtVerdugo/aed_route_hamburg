@@ -390,8 +390,11 @@ HTML_TEMPLATE = """<!doctype html>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Visor grafo indoor — Hamburg Hbf</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css"/>
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
 <style>
   html, body { margin:0; padding:0; height:100%; font-family: -apple-system, sans-serif; }
   #map { position:absolute; top:0; left:0; right:280px; bottom:0; }
@@ -453,12 +456,25 @@ const DOORS = __DOORS_JSON__;
 const ENTRANCES = __ENTRANCES_JSON__;
 const DB_LOUNGE = __DB_LOUNGE_JSON__;
 
-const map = L.map("map", { zoomControl: true }).setView([DEA.lat, DEA.lon], 18);
+// Basemap vectorial OpenFreeMap Positron (MapLibre GL vía
+// @maplibre/maplibre-gl-leaflet). Se referencia el estilo, nunca la URL de
+// teselas con fecha. Las teselas vectoriales llegan a z14; por encima
+// MapLibre las sobreescala. La capa GL no aporta maxZoom, así que se fija
+// en L.map (22, el que tenía la capa raster anterior).
+const BASEMAP = {
+  style: "https://tiles.openfreemap.org/styles/positron",
+  attribution:
+    '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> ' +
+    '<a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> ' +
+    'Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+};
 
-L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  { attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 22 }
-).addTo(map);
+const map = L.map("map", { zoomControl: true, maxZoom: 22 }).setView([DEA.lat, DEA.lon], 18);
+
+L.maplibreGL({
+  style: BASEMAP.style,
+  attributionControl: { customAttribution: BASEMAP.attribution },
+}).addTo(map);
 
 // One persistent LayerGroup per toggleable category. renderLevel() clears
 // and repopulates each one for the active level WITHOUT touching whether

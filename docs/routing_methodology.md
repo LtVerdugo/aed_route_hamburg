@@ -688,7 +688,10 @@ any route in `app/app.py` and is only reachable by navigating directly to
 remove) is a pending product decision, not yet made.
 
 **Frontend (Leaflet.js):**
-- Full-screen map with CartoDB Positron basemap
+- Full-screen map with OpenFreeMap Positron basemap (vector tiles,
+  rendered by MapLibre GL inside Leaflet 1.9.4 via
+  @maplibre/maplibre-gl-leaflet; no API key — see `docs/decisions.md`
+  for why the previous raster basemap was replaced)
 - Hamburg boundary rendered as a blue polyline (weight 2)
 - White SVG mask (fill-opacity 0.45, fill-rule evenodd)
   applied outside the Hamburg boundary to focus attention

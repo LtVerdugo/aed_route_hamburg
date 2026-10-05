@@ -44,19 +44,32 @@ const APP_BASE = (() => {
 const API_BASE = (window.AED_ROUTE_API_BASE || `${APP_BASE}/api`).replace(/\/$/, "");
 const apiUrl = (path) => `${API_BASE}/${path.replace(/^\/+/, "")}`;
 
+// ── Basemap ────────────────────────────────────────────────────
+// Único sitio donde se define el mapa base. OpenFreeMap Positron,
+// teselas vectoriales renderizadas con MapLibre GL dentro de Leaflet
+// (@maplibre/maplibre-gl-leaflet). Sin API key. Se referencia el estilo,
+// nunca la URL de teselas con fecha que el estilo resuelve por debajo.
+// Sustituye al basemap raster anterior, que pasó a exigir API key (ver
+// docs/decisions.md). maxZoom va en L.map porque la capa GL, a
+// diferencia del tileLayer anterior, no aporta uno propio.
+const BASEMAP = {
+  style: "https://tiles.openfreemap.org/styles/positron",
+  attribution:
+    '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> ' +
+    '<a href="https://www.openmaptiles.org/" target="_blank">&copy; OpenMapTiles</a> ' +
+    'Data from <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>',
+  maxZoom: 19,
+};
+
 // ── Map init ───────────────────────────────────────────────────
-const map = L.map("map", { zoomControl: false }).setView(
+const map = L.map("map", { zoomControl: false, maxZoom: BASEMAP.maxZoom }).setView(
   [53.5511, 9.9937], 12
 );
 
-L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  {
-    attribution: "© OpenStreetMap © CARTO",
-    subdomains: "abcd",
-    maxZoom: 19,
-  }
-).addTo(map);
+L.maplibreGL({
+  style: BASEMAP.style,
+  attributionControl: { customAttribution: BASEMAP.attribution },
+}).addTo(map);
 
 L.control.zoom({ position: "topright" }).addTo(map);
 
